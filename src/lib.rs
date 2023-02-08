@@ -1,65 +1,85 @@
 pub mod config;
+pub mod keys;
+pub mod screens;
 
 use config::*;
-use keyfn;
+use keys::*;
+use screens::*;
 use std::process;
-use std::thread;
 use x11rb::connection::Connection;
+use x11rb::protocol::xproto as xp;
 use x11rb::protocol::Event as XEvent;
-use x11rb::*;
-use xkbcommon::xkb;
-
-/// Matches a modkey name with it's mod mask value.
-///
-/// # Panics:
-/// This function panics if there's no such modkey.
-fn match_mod(modkey: &str) -> keyfn::Mod {
-    match &modkey.to_uppercase()[..] {
-        "SUPER" | "WIN" => keyfn::Mod::Windows,
-        "ALT" | "META" => keyfn::Mod::Alt,
-        "CTRL" | "CONTROL" => keyfn::Mod::Control,
-        "SHIFT" => keyfn::Mod::Shift,
-        "NUMLOCK" => keyfn::Mod::NumLock,
-        "CAPSLOCK" => keyfn::Mod::CapsLock,
-        "SCROLLLOCK" => keyfn::Mod::ScrollLock,
-        "MOD5" => keyfn::Mod::Mod5,
-        _ => panic!("No such modifier: {modkey}"),
-    }
-}
 
 /// The window manager I suppose.
 pub struct Lapin {
-    pub x_connection: rust_connection::RustConnection,
+    pub x_connection: x11rb::rust_connection::RustConnection,
     pub config: Config,
+    screens: Vec<Screen>,
+    current_scr: usize,
+    mouse_keymask: Option<xp::KeyButMask>,
+    keybinds: KeybindSet,
 }
 
 impl Lapin {
     /// The first function that should be called: to connect the window manager
     /// to the X server.
     pub fn connect() -> Self {
-        let (x_connection, _) = connect(None).expect("Cannot connect to the X server!");
+        let (x_connection, current_scr) =
+            x11rb::connect(None).expect("Cannot connect to the X server!");
         let config = Config::new();
+        let screens = Vec::new();
+        let keybinds = KeybindSet::new();
         Lapin {
             x_connection,
             config,
+            screens,
+            current_scr,
+            mouse_keymask: None,
+            keybinds,
         }
     }
 
-    /// The main event loop of the window manager. Ignores every key press
-    /// event as those are handled by keyfn.
-    pub fn event_loop(&self) -> ! {
+    /// Gets the current screen.
+    pub fn current_screen(&mut self) -> &mut Screen {
+        &mut self.screens[self.current_scr]
+    }
+
+    fn handle_event(&mut self, event: XEvent) -> Result<(), x11rb::errors::ConnectionError> {
+        match event {
+            XEvent::MapRequest(ev) => {
+                println!("map request received");
+                xp::map_window(&self.x_connection, ev.window)?;
+                self.x_connection.flush()?;
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// The main event loop of the window manager.
+    fn event_loop(&mut self) -> ! {
         loop {
             let event = self
                 .x_connection
                 .wait_for_event()
-                .expect("Connection to X server was closed!");
-            if let XEvent::KeyPress(_) = event {
-                println!("Ignoring keypress");
-                continue;
-            }
-            println!("Event received: {:?}", event);
+                .expect("Connection to the X server failed!");
+            self.handle_event(event)
+                .expect("Connection to the X server failed!");
         }
     }
+
+    pub fn init(&mut self) {
+        let (modmask, modbutton) = keys::match_mod(self.config.mouse_modkey);
+        self.mouse_keymask = Some(modbutton);
+
+        for screen in &self.x_connection.setup().roots {
+            self.screens.push(Screen::new(&self, screen.root, modmask));
+        }
+
+        self.event_loop();
+    }
+
+    pub fn killfocused(&self) {}
 }
 
 /// Function to spawn a command.
@@ -77,60 +97,6 @@ pub fn spawn(s: &str) {
 /// Function to terminate the window manager process.
 pub fn quit() {
     process::exit(0);
-}
-
-/// Keybind struct that can be binded on `init()`.
-pub struct Key {
-    mods: &'static [&'static str],
-    key: &'static str,
-    callback: &'static dyn Fn() -> (),
-}
-
-/// Keylist that is sent to `init()` to bind keys.
-pub type Keylist = &'static [&'static Key];
-
-impl Key {
-    /// Creates a new Keybind.
-    pub const fn new(
-        mods: &'static [&'static str],
-        key: &'static str,
-        callback: &'static dyn Fn() -> (),
-    ) -> Self {
-        Key {
-            mods,
-            key,
-            callback,
-        }
-    }
-}
-
-/// Returns a pointer to a `Key`. Basically a sugar to `&Key::new()`.
-#[macro_export]
-macro_rules! key {
-    ($mods:expr, $key:expr, $callback:expr) => {
-        &Key::new($mods, $key, $callback)
-    };
-}
-
-/// Binds keys and inits the window manager, the last function that should be
-/// called.
-pub fn init(lapin: Lapin, keys: &'static [&'static Key]) {
-    thread::spawn(move || lapin.event_loop());
-    let mut key_storage = keyfn::KeyStorage::new();
-    for key in keys {
-        let keysym = xkb::keysym_from_name(key.key, xkb::KEYSYM_CASE_INSENSITIVE);
-        if keysym == xkb::KEY_NoSymbol {
-            panic!("No such key: {}", key.key);
-        }
-        let keybind = keyfn::KeyBind::new(
-            keysym,
-            key.mods.iter().map(|s| match_mod(s)).collect(),
-            keyfn::Trigger::Pressed,
-            key.callback,
-        );
-        key_storage.add(keybind);
-    }
-    key_storage.start();
 }
 
 #[cfg(test)]

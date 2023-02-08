@@ -1,8 +1,14 @@
 /// General configuration of the window manager.
-pub struct Config {}
+pub struct Config {
+    pub mouse_modkey: &'static str,
+    pub workspaces: &'static [&'static str],
+}
 
 impl Config {
     pub fn new() -> Self {
-        Config {}
+        Config {
+            mouse_modkey: "Super",
+            workspaces: &["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+        }
     }
 }
