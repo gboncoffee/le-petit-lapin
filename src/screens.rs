@@ -8,7 +8,12 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new(lapin: &Lapin, root: xp::Window, modmask: xp::ModMask) -> Self {
+    pub fn new(
+        lapin: &Lapin,
+        root: xp::Window,
+        modmask: xp::ModMask,
+        keybinds: &KeybindSet,
+    ) -> Self {
         xp::grab_button(
             &lapin.x_connection,
             true,
@@ -17,11 +22,37 @@ impl Screen {
             xp::GrabMode::ASYNC,
             xp::GrabMode::ASYNC,
             root,
+            x11rb::NONE,
+            xp::ButtonIndex::ANY,
+            modmask,
+        )
+        .expect("Cannot grab the mouse!");
+        xp::grab_button(
+            &lapin.x_connection,
+            true,
             root,
+            xp::EventMask::BUTTON_PRESS | xp::EventMask::BUTTON_RELEASE,
+            xp::GrabMode::ASYNC,
+            xp::GrabMode::ASYNC,
+            root,
+            x11rb::NONE,
             xp::ButtonIndex::ANY,
             modmask | xp::ModMask::SHIFT,
         )
         .expect("Cannot grab the mouse!");
+
+        for ((modmask, _, code), _) in keybinds.iter() {
+            xp::grab_key(
+                &lapin.x_connection,
+                true,
+                root,
+                *modmask,
+                *code,
+                xp::GrabMode::ASYNC,
+                xp::GrabMode::ASYNC,
+            )
+            .expect("Cannot grab keybinds!");
+        }
 
         let event_mask = xp::EventMask::SUBSTRUCTURE_NOTIFY
             | xp::EventMask::STRUCTURE_NOTIFY

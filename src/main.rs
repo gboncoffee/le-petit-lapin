@@ -1,21 +1,22 @@
 use lapin::keys::*;
 use lapin::*;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn main() {
-    let lapin = Rc::new(RefCell::new(Lapin::connect()));
+    let mut lapin = Lapin::connect();
 
     const MODKEY: &str = "Meta";
     const TERMINAL: &str = "alacritty";
 
-    let keys = vec![
-        key!([MODKEY], "q", || quit()),
-        key!([MODKEY], "Return", || spawn(TERMINAL)),
-        key!([MODKEY], "n", || spawn("chromium")),
-        key!([MODKEY], "a", || spawn("rofi -show run")),
-        key!([MODKEY], "w", || lapin.borrow().killfocused()),
-    ];
+    lapin.config.mouse_modkey = MODKEY;
 
-    lapin.borrow_mut().init();
+    let mut keybinds = KeybindSet::new();
+    keybinds.bindall(vec![
+        (&[MODKEY], "q", lazy! {Lapin::quit()}),
+        (&[MODKEY], "Return", lazy! {Lapin::spawn(TERMINAL)}),
+        (&[MODKEY], "n", lazy! {Lapin::spawn("chromium")}),
+        (&[MODKEY], "a", lazy! {Lapin::spawn("rofi -show run")}),
+        (&[MODKEY], "w", lazy! {wm, wm.killfocused()}),
+    ]);
+
+    lapin.init(&mut keybinds);
 }

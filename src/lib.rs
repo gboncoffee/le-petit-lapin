@@ -14,10 +14,10 @@ use x11rb::protocol::Event as XEvent;
 pub struct Lapin {
     pub x_connection: x11rb::rust_connection::RustConnection,
     pub config: Config,
+    pub keybinds: KeybindSet,
     screens: Vec<Screen>,
     current_scr: usize,
     mouse_keymask: Option<xp::KeyButMask>,
-    keybinds: KeybindSet,
 }
 
 impl Lapin {
@@ -44,7 +44,11 @@ impl Lapin {
         &mut self.screens[self.current_scr]
     }
 
-    fn handle_event(&mut self, event: XEvent) -> Result<(), x11rb::errors::ConnectionError> {
+    fn handle_event(
+        &mut self,
+        event: XEvent,
+        keybinds: &mut KeybindSet,
+    ) -> Result<(), x11rb::errors::ConnectionError> {
         match event {
             XEvent::MapRequest(ev) => {
                 println!("map request received");
@@ -52,51 +56,62 @@ impl Lapin {
                 self.x_connection.flush()?;
                 Ok(())
             }
-            _ => Ok(()),
+            XEvent::KeyPress(ev) => {
+                println!("button pressed!");
+                if let Some(callback) = keybinds.get_callback(ev.detail, ev.state) {
+                    callback(self);
+                };
+                Ok(())
+            }
+            other => {
+                println!("Received event: {:?}", other);
+                Ok(())
+            }
         }
     }
 
     /// The main event loop of the window manager.
-    fn event_loop(&mut self) -> ! {
+    fn event_loop(&mut self, keybinds: &mut KeybindSet) -> ! {
         loop {
             let event = self
                 .x_connection
                 .wait_for_event()
                 .expect("Connection to the X server failed!");
-            self.handle_event(event)
+            self.handle_event(event, keybinds)
                 .expect("Connection to the X server failed!");
         }
     }
 
-    pub fn init(&mut self) {
+    pub fn init(&mut self, keybinds: &mut KeybindSet) {
         let (modmask, modbutton) = keys::match_mod(self.config.mouse_modkey);
         self.mouse_keymask = Some(modbutton);
 
         for screen in &self.x_connection.setup().roots {
-            self.screens.push(Screen::new(&self, screen.root, modmask));
+            self.screens
+                .push(Screen::new(&self, screen.root, modmask, keybinds));
         }
 
-        self.event_loop();
+        self.event_loop(keybinds);
     }
 
-    pub fn killfocused(&self) {}
-}
+    pub fn killfocused(&mut self) {}
 
-/// Function to spawn a command.
-pub fn spawn(s: &str) {
-    let mut iter = s.split_whitespace();
-    if let Some(prog) = iter.next() {
-        let mut cmd = process::Command::new(prog);
-        for arg in iter {
-            cmd.arg(arg);
+    /// Function to spawn a command.
+    pub fn spawn(s: &str) {
+        let mut iter = s.split_whitespace();
+        if let Some(prog) = iter.next() {
+            let mut cmd = process::Command::new(prog);
+            for arg in iter {
+                cmd.arg(arg);
+            }
+            cmd.spawn().ok();
         }
-        cmd.spawn().ok();
     }
-}
 
-/// Function to terminate the window manager process.
-pub fn quit() {
-    process::exit(0);
+    /// Function to terminate the window manager process.
+    pub fn quit() {
+        process::exit(0);
+    }
 }
 
 #[cfg(test)]

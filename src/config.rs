@@ -7,7 +7,7 @@ pub struct Config {
 impl Config {
     pub fn new() -> Self {
         Config {
-            mouse_modkey: "Super",
+            mouse_modkey: "Meta",
             workspaces: &["1", "2", "3", "4", "5", "6", "7", "8", "9"],
         }
     }
