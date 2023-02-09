@@ -6,18 +6,17 @@ use config::*;
 use keys::*;
 use screens::*;
 use std::process;
-use x11rb::connection::Connection;
-use x11rb::protocol::xproto as xp;
-use x11rb::protocol::Event as XEvent;
+use xcb::x;
+use xcb::Connection;
 
 /// The window manager I suppose.
 pub struct Lapin {
-    pub x_connection: x11rb::rust_connection::RustConnection,
+    pub x_connection: Connection,
     pub config: Config,
     pub keybinds: KeybindSet,
     screens: Vec<Screen>,
     current_scr: usize,
-    mouse_keymask: Option<xp::KeyButMask>,
+    mouse_keymask: Option<x::KeyButMask>,
 }
 
 impl Lapin {
@@ -25,7 +24,7 @@ impl Lapin {
     /// to the X server.
     pub fn connect() -> Self {
         let (x_connection, current_scr) =
-            x11rb::connect(None).expect("Cannot connect to the X server!");
+            Connection::connect(None).expect("Cannot connect to the X server!");
         let config = Config::new();
         let screens = Vec::new();
         let keybinds = KeybindSet::new();
@@ -33,7 +32,7 @@ impl Lapin {
             x_connection,
             config,
             screens,
-            current_scr,
+            current_scr: current_scr as usize,
             mouse_keymask: None,
             keybinds,
         }
@@ -44,28 +43,23 @@ impl Lapin {
         &mut self.screens[self.current_scr]
     }
 
-    fn handle_event(
-        &mut self,
-        event: XEvent,
-        keybinds: &mut KeybindSet,
-    ) -> Result<(), x11rb::errors::ConnectionError> {
+    fn handle_x_event(&mut self, event: x::Event, keybinds: &mut KeybindSet) {
         match event {
-            XEvent::MapRequest(ev) => {
+            x::Event::MapRequest(ev) => {
                 println!("map request received");
-                xp::map_window(&self.x_connection, ev.window)?;
-                self.x_connection.flush()?;
-                Ok(())
+                self.x_connection.send_request(&x::MapWindow {
+                    window: ev.window(),
+                });
+                self.x_connection.flush().ok();
             }
-            XEvent::KeyPress(ev) => {
+            x::Event::KeyPress(ev) => {
                 println!("button pressed!");
-                if let Some(callback) = keybinds.get_callback(ev.detail, ev.state) {
+                if let Some(callback) = keybinds.get_callback(ev.detail(), ev.state()) {
                     callback(self);
                 };
-                Ok(())
             }
             other => {
                 println!("Received event: {:?}", other);
-                Ok(())
             }
         }
     }
@@ -77,8 +71,10 @@ impl Lapin {
                 .x_connection
                 .wait_for_event()
                 .expect("Connection to the X server failed!");
-            self.handle_event(event, keybinds)
-                .expect("Connection to the X server failed!");
+            match event {
+                xcb::Event::X(ev) => self.handle_x_event(ev, keybinds),
+                _ => {}
+            }
         }
     }
 
@@ -86,9 +82,15 @@ impl Lapin {
         let (modmask, modbutton) = keys::match_mod(self.config.mouse_modkey);
         self.mouse_keymask = Some(modbutton);
 
-        for screen in &self.x_connection.setup().roots {
-            self.screens
-                .push(Screen::new(&self, screen.root, modmask, keybinds));
+        for screen in self.x_connection.get_setup().roots() {
+            self.screens.push(Screen::new(
+                &self,
+                screen.root(),
+                modmask,
+                keybinds,
+                screen.width_in_pixels(),
+                screen.height_in_pixels(),
+            ));
         }
 
         self.event_loop(keybinds);

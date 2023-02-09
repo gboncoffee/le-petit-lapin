@@ -1,84 +1,81 @@
 use crate::*;
-use x11rb::protocol::xproto as xp;
+use xcb::x;
+use xcb::Xid;
 
 pub struct Screen {
     pub workspaces: Vec<Workspace>,
     pub current_wk: usize,
-    pub root: xp::Window,
+    pub root: x::Window,
+    pub width: u16,
+    pub height: u16,
 }
 
 impl Screen {
     pub fn new(
         lapin: &Lapin,
-        root: xp::Window,
-        modmask: xp::ModMask,
+        root: x::Window,
+        modmask: x::ModMask,
         keybinds: &KeybindSet,
+        width: u16,
+        height: u16,
     ) -> Self {
-        xp::grab_button(
-            &lapin.x_connection,
-            true,
-            root,
-            xp::EventMask::BUTTON_PRESS | xp::EventMask::BUTTON_RELEASE,
-            xp::GrabMode::ASYNC,
-            xp::GrabMode::ASYNC,
-            root,
-            x11rb::NONE,
-            xp::ButtonIndex::ANY,
-            modmask,
-        )
-        .expect("Cannot grab the mouse!");
-        xp::grab_button(
-            &lapin.x_connection,
-            true,
-            root,
-            xp::EventMask::BUTTON_PRESS | xp::EventMask::BUTTON_RELEASE,
-            xp::GrabMode::ASYNC,
-            xp::GrabMode::ASYNC,
-            root,
-            x11rb::NONE,
-            xp::ButtonIndex::ANY,
-            modmask | xp::ModMask::SHIFT,
-        )
-        .expect("Cannot grab the mouse!");
+        lapin.x_connection.send_request(&x::GrabButton {
+            owner_events: true,
+            grab_window: root,
+            event_mask: x::EventMask::BUTTON_PRESS | x::EventMask::BUTTON_RELEASE,
+            pointer_mode: x::GrabMode::Async,
+            keyboard_mode: x::GrabMode::Async,
+            confine_to: x::Window::none(),
+            cursor: x::Cursor::none(),
+            button: x::ButtonIndex::Any,
+            modifiers: modmask,
+        });
+        lapin.x_connection.send_request(&x::GrabButton {
+            owner_events: true,
+            grab_window: root,
+            event_mask: x::EventMask::BUTTON_PRESS | x::EventMask::BUTTON_RELEASE,
+            pointer_mode: x::GrabMode::Async,
+            keyboard_mode: x::GrabMode::Async,
+            confine_to: x::Window::none(),
+            cursor: x::Cursor::none(),
+            button: x::ButtonIndex::Any,
+            modifiers: modmask | x::ModMask::SHIFT,
+        });
 
         for ((modmask, _, code), _) in keybinds.iter() {
-            xp::grab_key(
-                &lapin.x_connection,
-                true,
-                root,
-                *modmask,
-                *code,
-                xp::GrabMode::ASYNC,
-                xp::GrabMode::ASYNC,
-            )
-            .expect("Cannot grab keybinds!");
+            lapin.x_connection.send_request(&x::GrabKey {
+                owner_events: true,
+                grab_window: root,
+                modifiers: *modmask,
+                key: *code,
+                pointer_mode: x::GrabMode::Async,
+                keyboard_mode: x::GrabMode::Async,
+            });
         }
 
-        let event_mask = xp::EventMask::SUBSTRUCTURE_NOTIFY
-            | xp::EventMask::STRUCTURE_NOTIFY
-            | xp::EventMask::SUBSTRUCTURE_REDIRECT
-            | xp::EventMask::PROPERTY_CHANGE;
-        xp::change_window_attributes(
-            &lapin.x_connection,
-            root,
-            &xp::ChangeWindowAttributesAux::new().event_mask(event_mask),
-        )
-        .expect("Cannot change window attributes!");
+        let event_mask = x::EventMask::SUBSTRUCTURE_NOTIFY
+            | x::EventMask::STRUCTURE_NOTIFY
+            | x::EventMask::SUBSTRUCTURE_REDIRECT
+            | x::EventMask::PROPERTY_CHANGE;
+
+        lapin.x_connection.send_request(&x::ChangeWindowAttributes {
+            window: root,
+            value_list: &[x::Cw::EventMask(event_mask)],
+        });
 
         let mut workspaces = Vec::with_capacity(lapin.config.workspaces.len());
         for workspace in lapin.config.workspaces {
             workspaces.push(Workspace::new(workspace));
         }
 
-        lapin
-            .x_connection
-            .flush()
-            .expect("Connection to X server failed!");
+        lapin.x_connection.flush().ok();
 
         Screen {
             workspaces,
             root,
             current_wk: 0,
+            width,
+            height,
         }
     }
 
@@ -91,7 +88,7 @@ impl Screen {
 pub struct Workspace {
     pub name: &'static str,
     pub focused: Option<usize>,
-    pub windows: Vec<xp::Window>,
+    pub windows: Vec<x::Window>,
 }
 
 impl Workspace {

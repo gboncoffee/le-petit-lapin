@@ -2,18 +2,18 @@ use crate::*;
 use std::collections::hash_map;
 use std::collections::HashMap;
 use x11::xlib;
-use x11rb::protocol::xproto as xp;
+use xcb::x;
 
 pub type Callback = Box<dyn FnMut(&mut Lapin) -> ()>;
 
-pub fn match_butmask_with_modmask(modkey: xp::KeyButMask) -> xp::ModMask {
+pub fn match_butmask_with_modmask(modkey: x::KeyButMask) -> x::ModMask {
     match modkey {
-        xp::KeyButMask::SHIFT => xp::ModMask::SHIFT,
-        xp::KeyButMask::CONTROL => xp::ModMask::CONTROL,
-        xp::KeyButMask::LOCK => xp::ModMask::LOCK,
-        xp::KeyButMask::MOD1 => xp::ModMask::M1,
-        xp::KeyButMask::MOD2 => xp::ModMask::M2,
-        xp::KeyButMask::MOD4 => xp::ModMask::M4,
+        x::KeyButMask::SHIFT => x::ModMask::SHIFT,
+        x::KeyButMask::CONTROL => x::ModMask::CONTROL,
+        x::KeyButMask::LOCK => x::ModMask::LOCK,
+        x::KeyButMask::MOD1 => x::ModMask::N1,
+        x::KeyButMask::MOD2 => x::ModMask::N2,
+        x::KeyButMask::MOD4 => x::ModMask::N4,
         _ => panic!("Please never create two types to represent the same fucking thing"),
     }
 }
@@ -22,30 +22,30 @@ pub fn match_butmask_with_modmask(modkey: xp::KeyButMask) -> xp::ModMask {
 ///
 /// # Panics:
 /// This function panics if there's no such modkey.
-pub fn match_mod(modkey: &str) -> (xp::ModMask, xp::KeyButMask) {
+pub fn match_mod(modkey: &str) -> (x::ModMask, x::KeyButMask) {
     match &modkey.to_uppercase()[..] {
         "META" | "ALT" => (
-            match_butmask_with_modmask(xp::KeyButMask::MOD1),
-            xp::KeyButMask::MOD1,
+            match_butmask_with_modmask(x::KeyButMask::MOD1),
+            x::KeyButMask::MOD1,
         ),
         "SUPER" | "WIN" | "HYPER" => (
-            match_butmask_with_modmask(xp::KeyButMask::MOD4),
-            xp::KeyButMask::MOD4,
+            match_butmask_with_modmask(x::KeyButMask::MOD4),
+            x::KeyButMask::MOD4,
         ),
         "LOCK" => (
-            match_butmask_with_modmask(xp::KeyButMask::LOCK),
-            xp::KeyButMask::LOCK,
+            match_butmask_with_modmask(x::KeyButMask::LOCK),
+            x::KeyButMask::LOCK,
         ),
         "CTRL" | "CONTROL" => (
-            match_butmask_with_modmask(xp::KeyButMask::CONTROL),
-            xp::KeyButMask::CONTROL,
+            match_butmask_with_modmask(x::KeyButMask::CONTROL),
+            x::KeyButMask::CONTROL,
         ),
         other => panic!("No such modkey {other} or modkey not allowed"),
     }
 }
 
 /// Same but with a list.
-pub fn match_mods(mods: &[&str]) -> (xp::ModMask, xp::KeyButMask) {
+pub fn match_mods(mods: &[&str]) -> (x::ModMask, x::KeyButMask) {
     let mut moditer = mods.iter();
     let mut modmask = match_mod(moditer.next().expect("At least one modkey is required")).0;
     for newmod in moditer {
@@ -61,7 +61,7 @@ pub fn match_mods(mods: &[&str]) -> (xp::ModMask, xp::KeyButMask) {
 
 /// Keybind set.
 pub struct KeybindSet {
-    map: HashMap<(xp::ModMask, xp::KeyButMask, xp::Keycode), Callback>,
+    map: HashMap<(x::ModMask, x::KeyButMask, x::Keycode), Callback>,
 }
 
 impl KeybindSet {
@@ -91,8 +91,8 @@ impl KeybindSet {
 
     pub fn get_callback(
         &mut self,
-        code: xp::Keycode,
-        modmask: xp::KeyButMask,
+        code: x::Keycode,
+        modmask: x::KeyButMask,
     ) -> Option<&mut Callback> {
         if let Some(callback) =
             self.map
@@ -104,9 +104,7 @@ impl KeybindSet {
         }
     }
 
-    pub fn iter(
-        &self,
-    ) -> hash_map::Iter<(xp::ModMask, xp::KeyButMask, u8), Box<dyn FnMut(&mut Lapin)>> {
+    pub fn iter(&self) -> hash_map::Iter<(x::ModMask, x::KeyButMask, u8), Callback> {
         self.map.iter()
     }
 }
