@@ -1,6 +1,5 @@
 use crate::*;
 use xcb::x;
-use xcb::Xid;
 
 pub struct Screen {
     pub workspaces: Vec<Workspace>,
@@ -14,34 +13,11 @@ impl Screen {
     pub fn new(
         lapin: &Lapin,
         root: x::Window,
-        modmask: x::ModMask,
         keybinds: &KeybindSet,
         width: u16,
         height: u16,
     ) -> Self {
-        lapin.x_connection.send_request(&x::GrabButton {
-            owner_events: true,
-            grab_window: root,
-            event_mask: x::EventMask::BUTTON_PRESS | x::EventMask::BUTTON_RELEASE,
-            pointer_mode: x::GrabMode::Async,
-            keyboard_mode: x::GrabMode::Async,
-            confine_to: x::Window::none(),
-            cursor: x::Cursor::none(),
-            button: x::ButtonIndex::Any,
-            modifiers: modmask,
-        });
-        lapin.x_connection.send_request(&x::GrabButton {
-            owner_events: true,
-            grab_window: root,
-            event_mask: x::EventMask::BUTTON_PRESS | x::EventMask::BUTTON_RELEASE,
-            pointer_mode: x::GrabMode::Async,
-            keyboard_mode: x::GrabMode::Async,
-            confine_to: x::Window::none(),
-            cursor: x::Cursor::none(),
-            button: x::ButtonIndex::Any,
-            modifiers: modmask | x::ModMask::SHIFT,
-        });
-
+        // bind keys.
         for ((modmask, _, code), _) in keybinds.iter() {
             lapin.x_connection.send_request(&x::GrabKey {
                 owner_events: true,
@@ -52,6 +28,18 @@ impl Screen {
                 keyboard_mode: x::GrabMode::Async,
             });
         }
+
+        lapin.x_connection.send_request(&x::GrabButton {
+            owner_events: true,
+            grab_window: root,
+            event_mask: x::EventMask::BUTTON1_MOTION | x::EventMask::BUTTON3_MOTION,
+            pointer_mode: x::GrabMode::Async,
+            keyboard_mode: x::GrabMode::Async,
+            confine_to: x::WINDOW_NONE,
+            cursor: x::CURSOR_NONE,
+            button: x::ButtonIndex::Any,
+            modifiers: keys::match_mods(lapin.config.mouse_mod).0,
+        });
 
         let event_mask = x::EventMask::SUBSTRUCTURE_NOTIFY
             | x::EventMask::STRUCTURE_NOTIFY

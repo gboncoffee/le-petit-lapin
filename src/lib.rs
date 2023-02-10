@@ -9,6 +9,25 @@ use std::process;
 use xcb::x;
 use xcb::Connection;
 
+xcb::atoms_struct! {
+    #[derive(Copy, Clone, Debug)]
+    /// Atoms struct for the window manager.
+    pub(crate) struct Atoms {
+        pub wm_protocols => b"WM_PROTOCOLS" only_if_exists = false,
+        pub wm_del_window => b"WM_DELETE_WINDOW" only_if_exists = false,
+        pub wm_state => b"WM_STATE" only_if_exists = false,
+        pub wm_take_focus => b"WM_TAKE_FOCUS" only_if_exists = false,
+        pub net_active_window => b"_NET_ACTIVE_WINDOW" only_if_exists = false,
+        pub net_supported => b"_NET_SUPPORTED" only_if_exists = false,
+        pub net_wm_name => b"_NET_WM_NAME" only_if_exists = false,
+        pub net_wm_state => b"_NET_WM_STATE" only_if_exists = false,
+        pub net_wm_fullscreen => b"_NET_WM_STATE_FULLSCREEN" only_if_exists = false,
+        pub net_wm_window_type => b"_NET_WM_WINDOW_TYPE" only_if_exists = false,
+        pub net_wm_window_type_dialog => b"_NET_WM_WINDOW_TYPE_DIALOG" only_if_exists = false,
+        pub net_client_list => b"_NET_CLIENT_LIST" only_if_exists = false,
+    }
+}
+
 /// The window manager I suppose.
 pub struct Lapin {
     pub x_connection: Connection,
@@ -16,7 +35,7 @@ pub struct Lapin {
     pub keybinds: KeybindSet,
     screens: Vec<Screen>,
     current_scr: usize,
-    mouse_keymask: Option<x::KeyButMask>,
+    atoms: Option<Atoms>,
 }
 
 impl Lapin {
@@ -33,8 +52,8 @@ impl Lapin {
             config,
             screens,
             current_scr: current_scr as usize,
-            mouse_keymask: None,
             keybinds,
+            atoms: None,
         }
     }
 
@@ -79,19 +98,17 @@ impl Lapin {
     }
 
     pub fn init(&mut self, keybinds: &mut KeybindSet) {
-        let (modmask, modbutton) = keys::match_mod(self.config.mouse_modkey);
-        self.mouse_keymask = Some(modbutton);
-
         for screen in self.x_connection.get_setup().roots() {
             self.screens.push(Screen::new(
                 &self,
                 screen.root(),
-                modmask,
                 keybinds,
                 screen.width_in_pixels(),
                 screen.height_in_pixels(),
             ));
         }
+
+        self.atoms = Some(Atoms::intern_all(&self.x_connection).expect("Cannot init atoms!"));
 
         self.event_loop(keybinds);
     }

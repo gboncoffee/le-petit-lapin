@@ -7,8 +7,6 @@ fn main() {
     const MODKEY: &str = "Meta";
     const TERMINAL: &str = "alacritty";
 
-    lapin.config.mouse_modkey = MODKEY;
-
     let mut keybinds = KeybindSet::new();
     keybinds.bindall(vec![
         (&[MODKEY], "q", lazy! {Lapin::quit()}),
@@ -17,6 +15,8 @@ fn main() {
         (&[MODKEY], "a", lazy! {Lapin::spawn("rofi -show run")}),
         (&[MODKEY], "w", lazy! {wm, wm.killfocused()}),
     ]);
+
+    lapin.config.mouse_mod = &[MODKEY];
 
     lapin.init(&mut keybinds);
 }
