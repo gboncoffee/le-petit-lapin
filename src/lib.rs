@@ -1,11 +1,12 @@
 pub mod config;
 pub mod keys;
+pub mod lapin_api;
 pub mod screens;
 
 use config::*;
 use keys::*;
 use screens::*;
-use std::process;
+use std::fmt;
 use xcb::x;
 use xcb::Connection;
 
@@ -38,6 +39,27 @@ pub struct Lapin {
     atoms: Option<Atoms>,
 }
 
+impl fmt::Display for Lapin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let total_screens = self.screens.len();
+        let cur_screen = self.current_scr;
+        let total_workspaces = self.screens[cur_screen].workspaces.len();
+        let cur_workspace = self.screens[cur_screen].current_wk;
+        let total_windows = self.screens[cur_screen].workspaces[cur_workspace]
+            .windows
+            .len();
+        // gambiarra
+        let cur_window =
+            if let Some(win) = self.screens[cur_screen].workspaces[cur_workspace].focused {
+                format!("{win}")
+            } else {
+                "N/A".to_string()
+            };
+
+        f.write_str(&format!("Screen: {cur_screen}/{total_screens}, Workspace: {cur_workspace}/{total_workspaces}, Window: {cur_window}/{total_windows}"))
+    }
+}
+
 impl Lapin {
     /// The first function that should be called: to connect the window manager
     /// to the X server.
@@ -57,30 +79,92 @@ impl Lapin {
         }
     }
 
-    /// Gets the current screen.
-    pub fn current_screen(&mut self) -> &mut Screen {
-        &mut self.screens[self.current_scr]
+    fn window_location(&self, win: x::Window) -> Option<(usize, usize, usize)> {
+        for (s, screen) in self.screens.iter().enumerate() {
+            for (k, workspace) in screen.workspaces.iter().enumerate() {
+                for (w, window) in workspace.windows.iter().enumerate() {
+                    if *window == win {
+                        return Some((s, k, w));
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn manage_window(&mut self, ev: x::MapRequestEvent) {
+        self.x_connection.send_request(&x::ChangeWindowAttributes {
+            window: ev.window(),
+            value_list: &[x::Cw::EventMask(
+                x::EventMask::ENTER_WINDOW
+                    | x::EventMask::PROPERTY_CHANGE
+                    | x::EventMask::STRUCTURE_NOTIFY,
+            )],
+        });
+
+        self.x_connection.send_request(&x::MapWindow {
+            window: ev.window(),
+        });
+
+        let scr = self.current_scr;
+        let wk = self.screens[scr].current_wk;
+        self.screens[scr].workspaces[wk]
+            .windows
+            .insert(0, ev.window());
+
+        self.x_connection.flush().ok();
+    }
+
+    fn unmanage_window(&mut self, window: x::Window) {
+        println!("unmanage called");
+        if let Some((s, k, w)) = self.window_location(window) {
+            self.screens[s].workspaces[k].windows.remove(w);
+            self.screens[s].workspaces[k].focused = None;
+            let n_wins = self.screens[s].workspaces[k].windows.len();
+            if n_wins > 0 {
+                let window = if w != 0 {
+                    if w == n_wins {
+                        w - 1
+                    } else {
+                        w
+                    }
+                } else {
+                    0
+                };
+                self.x_connection.send_request(&x::SetInputFocus {
+                    revert_to: x::InputFocus::PointerRoot,
+                    focus: self.screens[s].workspaces[k].windows[window],
+                    time: x::CURRENT_TIME,
+                });
+                self.screens[s].workspaces[k].focused = Some(window);
+            }
+        }
+    }
+
+    fn toggle_focus(&mut self, window: x::Window) {
+        println!("toggle focus called");
+        if let Some((s, k, w)) = self.window_location(window) {
+            self.current_scr = s;
+            self.screens[s].current_wk = k;
+            self.screens[s].workspaces[k].focused = Some(w);
+        }
     }
 
     fn handle_x_event(&mut self, event: x::Event, keybinds: &mut KeybindSet) {
         match event {
-            x::Event::MapRequest(ev) => {
-                println!("map request received");
-                self.x_connection.send_request(&x::MapWindow {
-                    window: ev.window(),
-                });
-                self.x_connection.flush().ok();
-            }
+            x::Event::MapRequest(ev) => self.manage_window(ev),
             x::Event::KeyPress(ev) => {
-                println!("button pressed!");
                 if let Some(callback) = keybinds.get_callback(ev.detail(), ev.state()) {
                     callback(self);
-                };
+                }
             }
+            x::Event::DestroyNotify(ev) => self.unmanage_window(ev.event()),
+            x::Event::EnterNotify(ev) => self.toggle_focus(ev.event()),
             other => {
                 println!("Received event: {:?}", other);
             }
         }
+        println!("{self}");
     }
 
     /// The main event loop of the window manager.
@@ -95,41 +179,6 @@ impl Lapin {
                 _ => {}
             }
         }
-    }
-
-    pub fn init(&mut self, keybinds: &mut KeybindSet) {
-        for screen in self.x_connection.get_setup().roots() {
-            self.screens.push(Screen::new(
-                &self,
-                screen.root(),
-                keybinds,
-                screen.width_in_pixels(),
-                screen.height_in_pixels(),
-            ));
-        }
-
-        self.atoms = Some(Atoms::intern_all(&self.x_connection).expect("Cannot init atoms!"));
-
-        self.event_loop(keybinds);
-    }
-
-    pub fn killfocused(&mut self) {}
-
-    /// Function to spawn a command.
-    pub fn spawn(s: &str) {
-        let mut iter = s.split_whitespace();
-        if let Some(prog) = iter.next() {
-            let mut cmd = process::Command::new(prog);
-            for arg in iter {
-                cmd.arg(arg);
-            }
-            cmd.spawn().ok();
-        }
-    }
-
-    /// Function to terminate the window manager process.
-    pub fn quit() {
-        process::exit(0);
     }
 }
 
