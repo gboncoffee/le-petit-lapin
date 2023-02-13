@@ -19,7 +19,7 @@ impl Lapin {
 
         self.atoms = Some(Atoms::intern_all(&self.x_connection).expect("Cannot init atoms!"));
 
-        self.event_loop(keybinds);
+        self.main_event_loop(keybinds);
     }
 
     pub fn get_focused_window(&self) -> Option<x::Window> {

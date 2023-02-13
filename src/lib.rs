@@ -2,6 +2,7 @@ pub mod config;
 pub mod keys;
 pub mod lapin_api;
 pub mod screens;
+pub mod utils;
 
 use config::*;
 use keys::*;
@@ -95,11 +96,14 @@ impl Lapin {
     fn manage_window(&mut self, ev: x::MapRequestEvent) {
         self.x_connection.send_request(&x::ChangeWindowAttributes {
             window: ev.window(),
-            value_list: &[x::Cw::EventMask(
-                x::EventMask::ENTER_WINDOW
-                    | x::EventMask::PROPERTY_CHANGE
-                    | x::EventMask::STRUCTURE_NOTIFY,
-            )],
+            value_list: &[
+                x::Cw::BorderPixel(10),
+                x::Cw::EventMask(
+                    x::EventMask::ENTER_WINDOW
+                        | x::EventMask::PROPERTY_CHANGE
+                        | x::EventMask::STRUCTURE_NOTIFY,
+                ),
+            ],
         });
 
         self.x_connection.send_request(&x::MapWindow {
@@ -142,15 +146,54 @@ impl Lapin {
     }
 
     fn toggle_focus(&mut self, window: x::Window) {
-        println!("toggle focus called");
         if let Some((s, k, w)) = self.window_location(window) {
             self.current_scr = s;
             self.screens[s].current_wk = k;
             self.screens[s].workspaces[k].focused = Some(w);
+            self.x_connection.send_request(&x::SetInputFocus {
+                revert_to: x::InputFocus::None,
+                focus: window,
+                time: x::CURRENT_TIME,
+            });
         }
     }
 
-    fn handle_x_event(&mut self, event: x::Event, keybinds: &mut KeybindSet) {
+    fn init_mouse_action(&mut self, event: x::ButtonPressEvent, keybinds: &mut KeybindSet) {
+        let cookie = self.x_connection.send_request(&x::GetGeometry {
+            drawable: x::Drawable::Window(event.child()),
+        });
+        let reply = self
+            .x_connection
+            .wait_for_reply(cookie)
+            .expect("Connection to X server failed.");
+        let (x, y) = (reply.x(), reply.y());
+
+        let x_diff = event.root_x() - x;
+        let y_diff = event.root_y() - y;
+
+        loop {
+            match utils::get_x_event(&self.x_connection) {
+                x::Event::MotionNotify(ev) => {
+                    if ev.state().contains(x::KeyButMask::BUTTON1) {
+                        let list = [
+                            x::ConfigWindow::X((ev.root_x() - x_diff) as i32),
+                            x::ConfigWindow::Y((ev.root_y() - y_diff) as i32),
+                        ];
+                        self.x_connection.send_request(&x::ConfigureWindow {
+                            window: event.child(),
+                            value_list: &list,
+                        });
+                    } else if ev.state().contains(x::KeyButMask::BUTTON3) {
+                    }
+                    self.x_connection.flush().ok();
+                }
+                x::Event::ButtonRelease(_) => break,
+                other => self.handle_event(other, keybinds),
+            }
+        }
+    }
+
+    fn handle_event(&mut self, event: x::Event, keybinds: &mut KeybindSet) {
         match event {
             x::Event::MapRequest(ev) => self.manage_window(ev),
             x::Event::KeyPress(ev) => {
@@ -160,24 +203,17 @@ impl Lapin {
             }
             x::Event::DestroyNotify(ev) => self.unmanage_window(ev.event()),
             x::Event::EnterNotify(ev) => self.toggle_focus(ev.event()),
+            x::Event::ButtonPress(ev) => self.init_mouse_action(ev, keybinds),
             other => {
                 println!("Received event: {:?}", other);
             }
         }
-        println!("{self}");
     }
 
     /// The main event loop of the window manager.
-    fn event_loop(&mut self, keybinds: &mut KeybindSet) -> ! {
+    fn main_event_loop(&mut self, keybinds: &mut KeybindSet) -> ! {
         loop {
-            let event = self
-                .x_connection
-                .wait_for_event()
-                .expect("Connection to the X server failed!");
-            match event {
-                xcb::Event::X(ev) => self.handle_x_event(ev, keybinds),
-                _ => {}
-            }
+            self.handle_event(utils::get_x_event(&self.x_connection), keybinds);
         }
     }
 }

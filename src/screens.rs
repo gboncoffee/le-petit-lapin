@@ -32,7 +32,9 @@ impl Screen {
         lapin.x_connection.send_request(&x::GrabButton {
             owner_events: true,
             grab_window: root,
-            event_mask: x::EventMask::BUTTON1_MOTION | x::EventMask::BUTTON3_MOTION,
+            event_mask: x::EventMask::BUTTON_MOTION
+                | x::EventMask::BUTTON_PRESS
+                | x::EventMask::BUTTON_RELEASE,
             pointer_mode: x::GrabMode::Async,
             keyboard_mode: x::GrabMode::Async,
             confine_to: x::WINDOW_NONE,
