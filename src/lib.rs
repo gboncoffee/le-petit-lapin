@@ -120,7 +120,6 @@ impl Lapin {
     }
 
     fn unmanage_window(&mut self, window: x::Window) {
-        println!("unmanage called");
         if let Some((s, k, w)) = self.window_location(window) {
             self.screens[s].workspaces[k].windows.remove(w);
             self.screens[s].workspaces[k].focused = None;
@@ -151,69 +150,88 @@ impl Lapin {
             self.screens[s].current_wk = k;
             self.screens[s].workspaces[k].focused = Some(w);
             self.x_connection.send_request(&x::SetInputFocus {
-                revert_to: x::InputFocus::None,
+                revert_to: x::InputFocus::PointerRoot,
                 focus: window,
                 time: x::CURRENT_TIME,
             });
+            self.x_connection.send_request(&x::ConfigureWindow {
+                window,
+                value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
+            });
+            self.x_connection.flush().ok();
         }
     }
 
-    fn init_mouse_action(&mut self, event: x::ButtonPressEvent, keybinds: &mut KeybindSet) {
+    fn init_mouse_action(
+        &mut self,
+        event: &x::ButtonPressEvent,
+    ) -> (Option<i16>, Option<i16>, Option<x::Window>) {
         let cookie = self.x_connection.send_request(&x::GetGeometry {
             drawable: x::Drawable::Window(event.child()),
         });
-        let reply = self
-            .x_connection
-            .wait_for_reply(cookie)
-            .expect("Connection to X server failed.");
+        let reply = if let Ok(res) = self.x_connection.wait_for_reply(cookie) {
+            res
+        } else {
+            return (None, None, None);
+        };
         let (x, y) = (reply.x(), reply.y());
 
-        let x_diff = event.root_x() - x;
-        let y_diff = event.root_y() - y;
-
-        loop {
-            match utils::get_x_event(&self.x_connection) {
-                x::Event::MotionNotify(ev) => {
-                    if ev.state().contains(x::KeyButMask::BUTTON1) {
-                        let list = [
-                            x::ConfigWindow::X((ev.root_x() - x_diff) as i32),
-                            x::ConfigWindow::Y((ev.root_y() - y_diff) as i32),
-                        ];
-                        self.x_connection.send_request(&x::ConfigureWindow {
-                            window: event.child(),
-                            value_list: &list,
-                        });
-                    } else if ev.state().contains(x::KeyButMask::BUTTON3) {
-                    }
-                    self.x_connection.flush().ok();
-                }
-                x::Event::ButtonRelease(_) => break,
-                other => self.handle_event(other, keybinds),
-            }
-        }
+        (
+            Some(event.root_x() - x),
+            Some(event.root_y() - y),
+            Some(event.child()),
+        )
     }
 
-    fn handle_event(&mut self, event: x::Event, keybinds: &mut KeybindSet) {
-        match event {
-            x::Event::MapRequest(ev) => self.manage_window(ev),
-            x::Event::KeyPress(ev) => {
-                if let Some(callback) = keybinds.get_callback(ev.detail(), ev.state()) {
-                    callback(self);
-                }
-            }
-            x::Event::DestroyNotify(ev) => self.unmanage_window(ev.event()),
-            x::Event::EnterNotify(ev) => self.toggle_focus(ev.event()),
-            x::Event::ButtonPress(ev) => self.init_mouse_action(ev, keybinds),
-            other => {
-                println!("Received event: {:?}", other);
-            }
+    fn handle_motion(&self, ev: x::MotionNotifyEvent, x_diff: i16, y_diff: i16, window: x::Window) {
+        if ev.state().contains(x::KeyButMask::BUTTON1) {
+            let list = [
+                x::ConfigWindow::X((ev.root_x() - x_diff) as i32),
+                x::ConfigWindow::Y((ev.root_y() - y_diff) as i32),
+            ];
+            self.x_connection.send_request(&x::ConfigureWindow {
+                window,
+                value_list: &list,
+            });
+        } else if ev.state().contains(x::KeyButMask::BUTTON3) {
         }
+        self.x_connection.flush().ok();
     }
 
     /// The main event loop of the window manager.
     fn main_event_loop(&mut self, keybinds: &mut KeybindSet) -> ! {
+        // state for window motions.
+        let mut diff_x = None;
+        let mut diff_y = None;
+        let mut move_window = None;
+
         loop {
-            self.handle_event(utils::get_x_event(&self.x_connection), keybinds);
+            match utils::get_x_event(&self.x_connection) {
+                x::Event::MapRequest(ev) => self.manage_window(ev),
+                x::Event::KeyPress(ev) => {
+                    if let Some(callback) = keybinds.get_callback(ev.detail(), ev.state()) {
+                        callback(self);
+                    }
+                }
+                x::Event::DestroyNotify(ev) => self.unmanage_window(ev.window()),
+                x::Event::ButtonPress(ev) => {
+                    (diff_x, diff_y, move_window) = self.init_mouse_action(&ev)
+                }
+                x::Event::ButtonRelease(_) => (diff_x, diff_y) = (None, None),
+                x::Event::MotionNotify(ev) => {
+                    if let Some(x) = diff_x {
+                        if let Some(y) = diff_y {
+                            if let Some(win) = move_window {
+                                self.handle_motion(ev, x, y, win);
+                            }
+                        }
+                    }
+                }
+                x::Event::EnterNotify(ev) => self.toggle_focus(ev.event()),
+                // other => println!("{:?}", other),
+                _ => {}
+            }
+            println!("{self}");
         }
     }
 }
