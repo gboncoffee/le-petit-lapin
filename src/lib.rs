@@ -106,6 +106,11 @@ impl Lapin {
             ],
         });
 
+        self.x_connection.send_request(&x::ConfigureWindow {
+            window: ev.window(),
+            value_list: &[x::ConfigWindow::BorderWidth(self.config.border_width)],
+        });
+
         self.x_connection.send_request(&x::MapWindow {
             window: ev.window(),
         });
@@ -144,21 +149,25 @@ impl Lapin {
         }
     }
 
+    fn set_focus(&mut self, window: x::Window, s: usize, k: usize, w: usize) {
+        self.current_scr = s;
+        self.screens[s].current_wk = k;
+        self.screens[s].workspaces[k].focused = Some(w);
+        self.x_connection.send_request(&x::SetInputFocus {
+            revert_to: x::InputFocus::PointerRoot,
+            focus: window,
+            time: x::CURRENT_TIME,
+        });
+        self.x_connection.send_request(&x::ConfigureWindow {
+            window,
+            value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
+        });
+        self.x_connection.flush().ok();
+    }
+
     fn toggle_focus(&mut self, window: x::Window) {
         if let Some((s, k, w)) = self.window_location(window) {
-            self.current_scr = s;
-            self.screens[s].current_wk = k;
-            self.screens[s].workspaces[k].focused = Some(w);
-            self.x_connection.send_request(&x::SetInputFocus {
-                revert_to: x::InputFocus::PointerRoot,
-                focus: window,
-                time: x::CURRENT_TIME,
-            });
-            self.x_connection.send_request(&x::ConfigureWindow {
-                window,
-                value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
-            });
-            self.x_connection.flush().ok();
+            self.set_focus(window, s, k, w);
         }
     }
 
@@ -196,6 +205,34 @@ impl Lapin {
         } else if ev.state().contains(x::KeyButMask::BUTTON3) {
         }
         self.x_connection.flush().ok();
+    }
+
+    fn change_win(&mut self, previous: bool) {
+        let s = self.current_scr;
+        let k = self.screens[s].current_wk;
+        let n_wins = self.screens[s].workspaces[k].windows.len();
+        if n_wins > 1 {
+            self.screens[s].workspaces[k].focused =
+                if let Some(cwin) = self.screens[s].workspaces[k].focused {
+                    let new_n = if previous && cwin > 0 {
+                        cwin - 1
+                    } else if previous {
+                        n_wins - 1
+                    } else {
+                        cwin + 1
+                    };
+                    if new_n >= n_wins {
+                        Some(0)
+                    } else {
+                        Some(new_n)
+                    }
+                } else {
+                    Some(0)
+                };
+            let w_n = self.screens[s].workspaces[k].focused.unwrap();
+            let window = self.screens[s].workspaces[k].windows[w_n];
+            self.set_focus(window, s, k, w_n);
+        }
     }
 
     /// The main event loop of the window manager.

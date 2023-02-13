@@ -38,6 +38,14 @@ impl Lapin {
         self.x_connection.flush().ok();
     }
 
+    pub fn nextwin(&mut self) {
+        self.change_win(false);
+    }
+
+    pub fn prevwin(&mut self) {
+        self.change_win(true);
+    }
+
     /// Function to spawn a command.
     pub fn spawn(s: &str) {
         let mut iter = s.split_whitespace();

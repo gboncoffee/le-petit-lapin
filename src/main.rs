@@ -14,6 +14,8 @@ fn main() {
         (&[MODKEY], "n", lazy! {Lapin::spawn("chromium")}),
         (&[MODKEY], "a", lazy! {Lapin::spawn("rofi -show run")}),
         (&[MODKEY], "w", lazy! {wm, wm.killfocused()}),
+        (&[MODKEY], "j", lazy! {wm, wm.nextwin()}),
+        (&[MODKEY], "k", lazy! {wm, wm.prevwin()}),
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];
