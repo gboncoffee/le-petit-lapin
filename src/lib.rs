@@ -97,9 +97,10 @@ impl Lapin {
         self.x_connection.send_request(&x::ChangeWindowAttributes {
             window: ev.window(),
             value_list: &[
-                x::Cw::BorderPixel(10),
+                x::Cw::BorderPixel(self.config.border_color),
                 x::Cw::EventMask(
                     x::EventMask::ENTER_WINDOW
+                        | x::EventMask::LEAVE_WINDOW
                         | x::EventMask::PROPERTY_CHANGE
                         | x::EventMask::STRUCTURE_NOTIFY,
                 ),
@@ -130,7 +131,7 @@ impl Lapin {
             self.screens[s].workspaces[k].focused = None;
             let n_wins = self.screens[s].workspaces[k].windows.len();
             if n_wins > 0 {
-                let window = if w != 0 {
+                let win = if w != 0 {
                     if w == n_wins {
                         w - 1
                     } else {
@@ -139,12 +140,7 @@ impl Lapin {
                 } else {
                     0
                 };
-                self.x_connection.send_request(&x::SetInputFocus {
-                    revert_to: x::InputFocus::PointerRoot,
-                    focus: self.screens[s].workspaces[k].windows[window],
-                    time: x::CURRENT_TIME,
-                });
-                self.screens[s].workspaces[k].focused = Some(window);
+                self.set_focus(self.screens[s].workspaces[k].windows[win], s, k, win);
             }
         }
     }
@@ -162,6 +158,10 @@ impl Lapin {
             window,
             value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
         });
+        self.x_connection.send_request(&x::ChangeWindowAttributes {
+            window,
+            value_list: &[x::Cw::BorderPixel(self.config.border_color_focus)],
+        });
         self.x_connection.flush().ok();
     }
 
@@ -169,6 +169,13 @@ impl Lapin {
         if let Some((s, k, w)) = self.window_location(window) {
             self.set_focus(window, s, k, w);
         }
+    }
+
+    fn restore_border(&self, window: x::Window) {
+        self.x_connection.send_request(&x::ChangeWindowAttributes {
+            window,
+            value_list: &[x::Cw::BorderPixel(self.config.border_color)],
+        });
     }
 
     fn init_mouse_action(
@@ -265,15 +272,10 @@ impl Lapin {
                     }
                 }
                 x::Event::EnterNotify(ev) => self.toggle_focus(ev.event()),
+                x::Event::LeaveNotify(ev) => self.restore_border(ev.event()),
                 // other => println!("{:?}", other),
                 _ => {}
             }
-            println!("{self}");
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 }
