@@ -181,25 +181,41 @@ impl Lapin {
     fn init_mouse_action(
         &mut self,
         event: &x::ButtonPressEvent,
-    ) -> (Option<i16>, Option<i16>, Option<x::Window>) {
+    ) -> (
+        Option<i16>,
+        Option<i16>,
+        Option<i16>,
+        Option<i16>,
+        Option<x::Window>,
+    ) {
         let cookie = self.x_connection.send_request(&x::GetGeometry {
             drawable: x::Drawable::Window(event.child()),
         });
         let reply = if let Ok(res) = self.x_connection.wait_for_reply(cookie) {
             res
         } else {
-            return (None, None, None);
+            return (None, None, None, None, None);
         };
         let (x, y) = (reply.x(), reply.y());
 
         (
             Some(event.root_x() - x),
             Some(event.root_y() - y),
+            Some(reply.x()),
+            Some(reply.y()),
             Some(event.child()),
         )
     }
 
-    fn handle_motion(&self, ev: x::MotionNotifyEvent, x_diff: i16, y_diff: i16, window: x::Window) {
+    fn handle_motion(
+        &self,
+        ev: x::MotionNotifyEvent,
+        x_diff: i16,
+        y_diff: i16,
+        x_pos: i16,
+        y_pos: i16,
+        window: x::Window,
+    ) {
         if ev.state().contains(x::KeyButMask::BUTTON1) {
             let list = [
                 x::ConfigWindow::X((ev.root_x() - x_diff) as i32),
@@ -210,6 +226,14 @@ impl Lapin {
                 value_list: &list,
             });
         } else if ev.state().contains(x::KeyButMask::BUTTON3) {
+            let list = [
+                x::ConfigWindow::Width((ev.root_x() - x_pos) as u32),
+                x::ConfigWindow::Height((ev.root_y() - y_pos) as u32),
+            ];
+            self.x_connection.send_request(&x::ConfigureWindow {
+                window,
+                value_list: &list,
+            });
         }
         self.x_connection.flush().ok();
     }
@@ -247,6 +271,8 @@ impl Lapin {
         // state for window motions.
         let mut diff_x = None;
         let mut diff_y = None;
+        let mut pos_x = None;
+        let mut pos_y = None;
         let mut move_window = None;
 
         loop {
@@ -259,16 +285,16 @@ impl Lapin {
                 }
                 x::Event::DestroyNotify(ev) => self.unmanage_window(ev.window()),
                 x::Event::ButtonPress(ev) => {
-                    (diff_x, diff_y, move_window) = self.init_mouse_action(&ev)
+                    (diff_x, diff_y, pos_x, pos_y, move_window) = self.init_mouse_action(&ev)
                 }
                 x::Event::ButtonRelease(_) => (diff_x, diff_y) = (None, None),
                 x::Event::MotionNotify(ev) => {
-                    if let Some(x) = diff_x {
-                        if let Some(y) = diff_y {
-                            if let Some(win) = move_window {
-                                self.handle_motion(ev, x, y, win);
-                            }
-                        }
+                    if let Some(x_d) = diff_x {
+                        let y_d = diff_y.unwrap();
+                        let x_p = pos_x.unwrap();
+                        let y_p = pos_y.unwrap();
+                        let win = move_window.unwrap();
+                        self.handle_motion(ev, x_d, y_d, x_p, y_p, win);
                     }
                 }
                 x::Event::EnterNotify(ev) => self.toggle_focus(ev.event()),
