@@ -243,6 +243,9 @@ impl Lapin {
         let k = self.screens[s].current_wk;
         let n_wins = self.screens[s].workspaces[k].windows.len();
         if n_wins > 1 {
+            if let Some(win) = self.get_focused_window() {
+                self.restore_border(win);
+            }
             self.screens[s].workspaces[k].focused =
                 if let Some(cwin) = self.screens[s].workspaces[k].focused {
                     let new_n = if previous && cwin > 0 {
