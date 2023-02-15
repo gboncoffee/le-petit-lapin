@@ -5,18 +5,10 @@ pub struct Screen {
     pub workspaces: Vec<Workspace>,
     pub current_wk: usize,
     pub root: x::Window,
-    pub width: u16,
-    pub height: u16,
 }
 
 impl Screen {
-    pub fn new(
-        lapin: &Lapin,
-        root: x::Window,
-        keybinds: &KeybindSet,
-        width: u16,
-        height: u16,
-    ) -> Self {
+    pub fn new(lapin: &Lapin, root: x::Window, keybinds: &KeybindSet) -> Self {
         // bind keys.
         for ((modmask, _, code), _) in keybinds.iter() {
             lapin.x_connection.send_request(&x::GrabKey {
@@ -64,8 +56,6 @@ impl Screen {
             workspaces,
             root,
             current_wk: 0,
-            width,
-            height,
         }
     }
 
@@ -79,6 +69,7 @@ pub struct Workspace {
     pub name: &'static str,
     pub focused: Option<usize>,
     pub windows: Vec<x::Window>,
+    pub layout: usize,
 }
 
 impl Workspace {
@@ -87,6 +78,7 @@ impl Workspace {
             name,
             focused: None,
             windows: Vec::new(),
+            layout: 0,
         }
     }
 }

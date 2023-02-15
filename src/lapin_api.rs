@@ -8,13 +8,8 @@ use xcb::x;
 impl Lapin {
     pub fn init(&mut self, keybinds: &mut KeybindSet) {
         for screen in self.x_connection.get_setup().roots() {
-            self.screens.push(Screen::new(
-                &self,
-                screen.root(),
-                keybinds,
-                screen.width_in_pixels(),
-                screen.height_in_pixels(),
-            ));
+            self.screens
+                .push(Screen::new(&self, screen.root(), keybinds));
         }
 
         self.atoms = Some(Atoms::intern_all(&self.x_connection).expect("Cannot init atoms!"));

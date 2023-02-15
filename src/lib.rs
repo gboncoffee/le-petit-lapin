@@ -1,6 +1,7 @@
 pub mod config;
 pub mod keys;
 pub mod lapin_api;
+pub mod layouts;
 pub mod screens;
 pub mod utils;
 
@@ -35,7 +36,7 @@ pub struct Lapin {
     pub x_connection: Connection,
     pub config: Config,
     pub keybinds: KeybindSet,
-    screens: Vec<Screen>,
+    pub screens: Vec<Screen>,
     current_scr: usize,
     atoms: Option<Atoms>,
 }
@@ -107,20 +108,25 @@ impl Lapin {
             ],
         });
 
-        self.x_connection.send_request(&x::ConfigureWindow {
-            window: ev.window(),
-            value_list: &[x::ConfigWindow::BorderWidth(self.config.border_width)],
-        });
-
-        self.x_connection.send_request(&x::MapWindow {
-            window: ev.window(),
-        });
+        if self.current_layout().draw_borders() {
+            self.x_connection.send_request(&x::ConfigureWindow {
+                window: ev.window(),
+                value_list: &[x::ConfigWindow::BorderWidth(self.config.border_width)],
+            });
+        }
 
         let scr = self.current_scr;
         let wk = self.screens[scr].current_wk;
         self.screens[scr].workspaces[wk]
             .windows
             .insert(0, ev.window());
+
+        self.current_layout()
+            .newwin(&mut self.workspace_windows(), &self.x_connection);
+
+        self.x_connection.send_request(&x::MapWindow {
+            window: ev.window(),
+        });
 
         self.x_connection.flush().ok();
     }
@@ -142,6 +148,11 @@ impl Lapin {
                 };
                 self.set_focus(self.screens[s].workspaces[k].windows[win], s, k, win);
             }
+            self.current_layout().delwin(
+                &mut self.workspace_windows(),
+                self.current_workspace().focused,
+                &self.x_connection,
+            );
         }
     }
 
@@ -158,10 +169,12 @@ impl Lapin {
             window,
             value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
         });
-        self.x_connection.send_request(&x::ChangeWindowAttributes {
-            window,
-            value_list: &[x::Cw::BorderPixel(self.config.border_color_focus)],
-        });
+        if self.current_layout().draw_borders() {
+            self.x_connection.send_request(&x::ChangeWindowAttributes {
+                window,
+                value_list: &[x::Cw::BorderPixel(self.config.border_color_focus)],
+            });
+        }
         self.x_connection.flush().ok();
     }
 
@@ -172,10 +185,12 @@ impl Lapin {
     }
 
     fn restore_border(&self, window: x::Window) {
-        self.x_connection.send_request(&x::ChangeWindowAttributes {
-            window,
-            value_list: &[x::Cw::BorderPixel(self.config.border_color)],
-        });
+        if self.current_layout().draw_borders() {
+            self.x_connection.send_request(&x::ChangeWindowAttributes {
+                window,
+                value_list: &[x::Cw::BorderPixel(self.config.border_color)],
+            });
+        }
     }
 
     fn init_mouse_action(
@@ -266,6 +281,12 @@ impl Lapin {
             let w_n = self.screens[s].workspaces[k].focused.unwrap();
             let window = self.screens[s].workspaces[k].windows[w_n];
             self.set_focus(window, s, k, w_n);
+            self.current_layout().changewin(
+                &mut self.workspace_windows(),
+                w_n,
+                &self.x_connection,
+                previous,
+            );
         }
     }
 
@@ -281,30 +302,56 @@ impl Lapin {
         loop {
             match utils::get_x_event(&self.x_connection) {
                 x::Event::MapRequest(ev) => self.manage_window(ev),
+                x::Event::DestroyNotify(ev) => self.unmanage_window(ev.window()),
+                x::Event::EnterNotify(ev) => self.toggle_focus(ev.event()),
+                x::Event::LeaveNotify(ev) => self.restore_border(ev.event()),
                 x::Event::KeyPress(ev) => {
                     if let Some(callback) = keybinds.get_callback(ev.detail(), ev.state()) {
                         callback(self);
                     }
                 }
-                x::Event::DestroyNotify(ev) => self.unmanage_window(ev.window()),
                 x::Event::ButtonPress(ev) => {
-                    (diff_x, diff_y, pos_x, pos_y, move_window) = self.init_mouse_action(&ev)
-                }
-                x::Event::ButtonRelease(_) => (diff_x, diff_y) = (None, None),
-                x::Event::MotionNotify(ev) => {
-                    if let Some(x_d) = diff_x {
-                        let y_d = diff_y.unwrap();
-                        let x_p = pos_x.unwrap();
-                        let y_p = pos_y.unwrap();
-                        let win = move_window.unwrap();
-                        self.handle_motion(ev, x_d, y_d, x_p, y_p, win);
+                    if self.current_layout().allow_motions() {
+                        (diff_x, diff_y, pos_x, pos_y, move_window) = self.init_mouse_action(&ev)
                     }
                 }
-                x::Event::EnterNotify(ev) => self.toggle_focus(ev.event()),
-                x::Event::LeaveNotify(ev) => self.restore_border(ev.event()),
+                x::Event::ButtonRelease(_) => {
+                    if self.current_layout().allow_motions() {
+                        (diff_x, diff_y) = (None, None)
+                    }
+                }
+                x::Event::MotionNotify(ev) => {
+                    if self.current_layout().allow_motions() {
+                        if let Some(x_d) = diff_x {
+                            let y_d = diff_y.unwrap();
+                            let x_p = pos_x.unwrap();
+                            let y_p = pos_y.unwrap();
+                            let win = move_window.unwrap();
+                            self.handle_motion(ev, x_d, y_d, x_p, y_p, win);
+                        }
+                    }
+                }
                 // other => println!("{:?}", other),
                 _ => {}
             }
         }
+    }
+
+    fn current_screen<'a>(&'a self) -> &'a Screen {
+        &self.screens[self.current_scr]
+    }
+
+    fn current_workspace<'a>(&'a self) -> &'a Workspace {
+        let wk = self.current_screen().current_wk;
+        &self.current_screen().workspaces[wk]
+    }
+
+    fn current_layout<'a>(&'a self) -> &'a Box<dyn layouts::Layout> {
+        let layout = self.current_workspace().layout;
+        &self.config.layouts[layout]
+    }
+
+    fn workspace_windows<'a>(&'a self) -> std::slice::Iter<'a, x::Window> {
+        self.current_workspace().windows.iter()
     }
 }
