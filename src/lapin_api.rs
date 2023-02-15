@@ -41,6 +41,14 @@ impl Lapin {
         self.change_win(true);
     }
 
+    pub fn next_layout(&mut self) {
+        self.change_layout(false);
+    }
+
+    pub fn prev_layout(&mut self) {
+        self.change_layout(true);
+    }
+
     /// Function to spawn a command.
     pub fn spawn(s: &str) {
         let mut iter = s.split_whitespace();

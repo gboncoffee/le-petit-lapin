@@ -1,4 +1,5 @@
 use lapin::keys::*;
+use lapin::layouts::*;
 use lapin::*;
 
 fn main() {
@@ -16,9 +17,12 @@ fn main() {
         (&[MODKEY], "w", lazy! {wm, wm.killfocused()}),
         (&[MODKEY], "j", lazy! {wm, wm.nextwin()}),
         (&[MODKEY], "k", lazy! {wm, wm.prevwin()}),
+        (&[MODKEY], "space", lazy! {wm, wm.next_layout()}),
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];
+
+    lapin.config.layouts = layouts![Floating::new(), Maximized::new(1280, 800)];
 
     lapin.init(&mut keybinds);
 }

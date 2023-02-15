@@ -94,6 +94,36 @@ impl Lapin {
         None
     }
 
+    fn add_border(&self, w: x::Window) {
+        self.x_connection.send_request(&x::ConfigureWindow {
+            window: w,
+            value_list: &[x::ConfigWindow::BorderWidth(self.config.border_width)],
+        });
+    }
+
+    fn color_focused_border(&self, w: x::Window) {
+        self.x_connection.send_request(&x::ChangeWindowAttributes {
+            window: w,
+            value_list: &[x::Cw::BorderPixel(self.config.border_color_focus)],
+        });
+    }
+
+    fn restore_border(&self, window: x::Window) {
+        if self.current_layout().draw_borders() {
+            self.x_connection.send_request(&x::ChangeWindowAttributes {
+                window,
+                value_list: &[x::Cw::BorderPixel(self.config.border_color)],
+            });
+        }
+    }
+
+    fn remove_border(&self, window: x::Window) {
+        self.x_connection.send_request(&x::ConfigureWindow {
+            window,
+            value_list: &[x::ConfigWindow::BorderWidth(0)],
+        });
+    }
+
     fn manage_window(&mut self, ev: x::MapRequestEvent) {
         self.x_connection.send_request(&x::ChangeWindowAttributes {
             window: ev.window(),
@@ -109,10 +139,7 @@ impl Lapin {
         });
 
         if self.current_layout().draw_borders() {
-            self.x_connection.send_request(&x::ConfigureWindow {
-                window: ev.window(),
-                value_list: &[x::ConfigWindow::BorderWidth(self.config.border_width)],
-            });
+            self.add_border(ev.window());
         }
 
         let scr = self.current_scr;
@@ -170,10 +197,7 @@ impl Lapin {
             value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
         });
         if self.current_layout().draw_borders() {
-            self.x_connection.send_request(&x::ChangeWindowAttributes {
-                window,
-                value_list: &[x::Cw::BorderPixel(self.config.border_color_focus)],
-            });
+            self.color_focused_border(window);
         }
         self.x_connection.flush().ok();
     }
@@ -181,15 +205,6 @@ impl Lapin {
     fn toggle_focus(&mut self, window: x::Window) {
         if let Some((s, k, w)) = self.window_location(window) {
             self.set_focus(window, s, k, w);
-        }
-    }
-
-    fn restore_border(&self, window: x::Window) {
-        if self.current_layout().draw_borders() {
-            self.x_connection.send_request(&x::ChangeWindowAttributes {
-                window,
-                value_list: &[x::Cw::BorderPixel(self.config.border_color)],
-            });
         }
     }
 
@@ -288,6 +303,44 @@ impl Lapin {
                 previous,
             );
         }
+    }
+
+    fn change_layout(&mut self, previous: bool) {
+        let l = if self.current_workspace().layout == 0 {
+            self.config.layouts.len() - 1
+        } else if self.current_workspace().layout == self.config.layouts.len() - 1 {
+            0
+        } else if previous {
+            self.current_workspace().layout - 1
+        } else {
+            self.current_workspace().layout + 1
+        };
+
+        let s = self.current_scr;
+        let k = self.screens[s].current_wk;
+        self.screens[s].workspaces[k].layout = l;
+
+        self.current_layout()
+            .reload(&mut self.workspace_windows(), &self.x_connection);
+
+        if let Some(cur_win) = self.get_focused_window() {
+            if self.current_layout().draw_borders() {
+                for window in self.workspace_windows() {
+                    self.add_border(*window);
+                    if *window == cur_win {
+                        self.color_focused_border(*window);
+                    } else {
+                        self.restore_border(*window);
+                    }
+                }
+            } else {
+                for window in self.workspace_windows() {
+                    self.remove_border(*window);
+                }
+            }
+        }
+
+        self.x_connection.flush().ok();
     }
 
     /// The main event loop of the window manager.
