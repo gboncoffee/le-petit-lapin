@@ -40,6 +40,10 @@ pub fn match_mod(modkey: &str) -> (x::ModMask, x::KeyButMask) {
             match_butmask_with_modmask(x::KeyButMask::CONTROL),
             x::KeyButMask::CONTROL,
         ),
+        "SHIFT" => (
+            match_butmask_with_modmask(x::KeyButMask::SHIFT),
+            x::KeyButMask::SHIFT,
+        ),
         other => panic!("No such modkey {other} or modkey not allowed"),
     }
 }
