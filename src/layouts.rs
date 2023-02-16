@@ -1,92 +1,92 @@
+use std::slice::Iter;
 use xcb::x;
 use xcb::Connection;
 
 pub trait Layout {
-    fn newwin(&self, windows: &mut dyn Iterator<Item = &x::Window>, con: &Connection);
+    fn newwin(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32);
     fn delwin(
         &self,
-        windows: &mut dyn Iterator<Item = &x::Window>,
+        windows: &mut Iter<x::Window>,
         current: Option<usize>,
         con: &Connection,
+        width: u32,
+        height: u32,
     );
-    fn reload(&self, windows: &mut dyn Iterator<Item = &x::Window>, con: &Connection);
+    fn reload(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32);
     fn changewin(
         &self,
-        windows: &mut dyn Iterator<Item = &x::Window>,
+        windows: &mut Iter<x::Window>,
         number: usize,
         con: &Connection,
         previous: bool,
+        width: u32,
+        height: u32,
     );
     fn allow_motions(&self) -> bool;
-    fn draw_borders(&self) -> bool;
+    fn border_width(&self) -> u32;
 
     fn name(&self) -> &'static str;
 }
 
 pub struct Floating {
-    pub borders: bool,
+    pub borders: u32,
     pub name: &'static str,
 }
 
 impl Floating {
     pub fn new() -> Self {
         Floating {
-            borders: true,
+            borders: 4,
             name: "Floating",
         }
     }
 }
 
 impl Layout for Floating {
-    fn name(&self) -> &'static str {
-        self.name
+    fn newwin(&self, _windows: &mut Iter<x::Window>, _con: &Connection, _width: u32, _height: u32) {
     }
-
-    fn allow_motions(&self) -> bool {
-        true
-    }
-
-    fn draw_borders(&self) -> bool {
-        self.borders
-    }
-
-    fn newwin(&self, _windows: &mut dyn Iterator<Item = &x::Window>, _con: &Connection) {}
     fn delwin(
         &self,
-        _windows: &mut dyn Iterator<Item = &x::Window>,
+        _windows: &mut Iter<x::Window>,
         _current: Option<usize>,
         _con: &Connection,
+        _width: u32,
+        _height: u32,
     ) {
     }
-    fn reload(&self, _windows: &mut dyn Iterator<Item = &x::Window>, _con: &Connection) {}
+    fn reload(&self, _windows: &mut Iter<x::Window>, _con: &Connection, _width: u32, _height: u32) {
+    }
     fn changewin(
         &self,
-        _windows: &mut dyn Iterator<Item = &x::Window>,
+        _windows: &mut Iter<x::Window>,
         _number: usize,
         _con: &Connection,
         _previous: bool,
+        _width: u32,
+        _height: u32,
     ) {
+    }
+    fn allow_motions(&self) -> bool {
+        true
+    }
+    fn border_width(&self) -> u32 {
+        self.borders
+    }
+    fn name(&self) -> &'static str {
+        self.name
     }
 }
 
-pub struct Tiling {}
-
 pub struct Maximized {
     pub name: &'static str,
-    pub width: u16,
-    pub height: u16,
-    pub pos: (i32, i32),
-    pub borders: bool,
+    pub borders: u32,
 }
 
 impl Maximized {
-    pub fn new(width: u16, height: u16) -> Maximized {
+    pub fn new() -> Maximized {
         Maximized {
-            width,
-            height,
             name: "Maximized",
-            pos: (0, 0),
-            borders: false,
+            borders: 0,
         }
     }
 }
@@ -100,29 +100,29 @@ impl Layout for Maximized {
         false
     }
 
-    fn draw_borders(&self) -> bool {
+    fn border_width(&self) -> u32 {
         self.borders
     }
 
-    fn newwin(&self, windows: &mut dyn Iterator<Item = &x::Window>, con: &Connection) {
+    fn newwin(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32) {
         let window = *windows.next().unwrap();
         let list = [
-            x::ConfigWindow::X(self.pos.0),
-            x::ConfigWindow::Y(self.pos.1),
-            x::ConfigWindow::Width(self.width as u32),
-            x::ConfigWindow::Height(self.height as u32),
+            x::ConfigWindow::X(0),
+            x::ConfigWindow::Y(0),
+            x::ConfigWindow::Width(width),
+            x::ConfigWindow::Height(height),
         ];
         con.send_request(&x::ConfigureWindow {
             window,
             value_list: &list,
         });
     }
-    fn reload(&self, windows: &mut dyn Iterator<Item = &x::Window>, con: &Connection) {
+    fn reload(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32) {
         let list = [
-            x::ConfigWindow::X(self.pos.0),
-            x::ConfigWindow::Y(self.pos.1),
-            x::ConfigWindow::Width(self.width as u32),
-            x::ConfigWindow::Height(self.height as u32),
+            x::ConfigWindow::X(0),
+            x::ConfigWindow::Y(0),
+            x::ConfigWindow::Width(width),
+            x::ConfigWindow::Height(height),
         ];
         for window in windows {
             con.send_request(&x::ConfigureWindow {
@@ -130,20 +130,25 @@ impl Layout for Maximized {
                 value_list: &list,
             });
         }
+        con.flush().ok();
     }
     fn delwin(
         &self,
-        _windows: &mut dyn Iterator<Item = &x::Window>,
+        _windows: &mut Iter<x::Window>,
         _current: Option<usize>,
         _con: &Connection,
+        _width: u32,
+        _height: u32,
     ) {
     }
     fn changewin(
         &self,
-        _windows: &mut dyn Iterator<Item = &x::Window>,
+        _windows: &mut Iter<x::Window>,
         _number: usize,
         _con: &Connection,
         _previous: bool,
+        _width: u32,
+        _height: u32,
     ) {
     }
 }

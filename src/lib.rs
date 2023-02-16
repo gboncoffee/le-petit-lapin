@@ -97,7 +97,9 @@ impl Lapin {
     fn add_border(&self, w: x::Window) {
         self.x_connection.send_request(&x::ConfigureWindow {
             window: w,
-            value_list: &[x::ConfigWindow::BorderWidth(self.config.border_width)],
+            value_list: &[x::ConfigWindow::BorderWidth(
+                self.current_layout().border_width(),
+            )],
         });
     }
 
@@ -109,18 +111,9 @@ impl Lapin {
     }
 
     fn restore_border(&self, window: x::Window) {
-        if self.current_layout().draw_borders() {
-            self.x_connection.send_request(&x::ChangeWindowAttributes {
-                window,
-                value_list: &[x::Cw::BorderPixel(self.config.border_color)],
-            });
-        }
-    }
-
-    fn remove_border(&self, window: x::Window) {
-        self.x_connection.send_request(&x::ConfigureWindow {
+        self.x_connection.send_request(&x::ChangeWindowAttributes {
             window,
-            value_list: &[x::ConfigWindow::BorderWidth(0)],
+            value_list: &[x::Cw::BorderPixel(self.config.border_color)],
         });
     }
 
@@ -138,9 +131,7 @@ impl Lapin {
             ],
         });
 
-        if self.current_layout().draw_borders() {
-            self.add_border(ev.window());
-        }
+        self.add_border(ev.window());
 
         let scr = self.current_scr;
         let wk = self.screens[scr].current_wk;
@@ -148,8 +139,12 @@ impl Lapin {
             .windows
             .insert(0, ev.window());
 
-        self.current_layout()
-            .newwin(&mut self.workspace_windows(), &self.x_connection);
+        self.current_layout().newwin(
+            &mut self.workspace_windows(),
+            &self.x_connection,
+            self.current_screen().width,
+            self.current_screen().height,
+        );
 
         self.x_connection.send_request(&x::MapWindow {
             window: ev.window(),
@@ -179,6 +174,8 @@ impl Lapin {
                 &mut self.workspace_windows(),
                 self.current_workspace().focused,
                 &self.x_connection,
+                self.current_screen().width,
+                self.current_screen().height,
             );
         }
     }
@@ -196,9 +193,7 @@ impl Lapin {
             window,
             value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
         });
-        if self.current_layout().draw_borders() {
-            self.color_focused_border(window);
-        }
+        self.color_focused_border(window);
         self.x_connection.flush().ok();
     }
 
@@ -301,6 +296,8 @@ impl Lapin {
                 w_n,
                 &self.x_connection,
                 previous,
+                self.current_screen().width,
+                self.current_screen().height,
             );
         }
     }
@@ -320,27 +317,25 @@ impl Lapin {
         let k = self.screens[s].current_wk;
         self.screens[s].workspaces[k].layout = l;
 
-        self.current_layout()
-            .reload(&mut self.workspace_windows(), &self.x_connection);
-
         if let Some(cur_win) = self.get_focused_window() {
-            if self.current_layout().draw_borders() {
-                for window in self.workspace_windows() {
-                    self.add_border(*window);
-                    if *window == cur_win {
-                        self.color_focused_border(*window);
-                    } else {
-                        self.restore_border(*window);
-                    }
-                }
-            } else {
-                for window in self.workspace_windows() {
-                    self.remove_border(*window);
+            for window in self.workspace_windows() {
+                self.add_border(*window);
+                if *window == cur_win {
+                    self.color_focused_border(*window);
+                } else {
+                    self.restore_border(*window);
                 }
             }
         }
 
         self.x_connection.flush().ok();
+
+        self.current_layout().reload(
+            &mut self.workspace_windows(),
+            &self.x_connection,
+            self.current_screen().width,
+            self.current_screen().height,
+        );
     }
 
     /// The main event loop of the window manager.

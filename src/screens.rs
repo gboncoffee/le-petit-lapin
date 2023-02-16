@@ -5,6 +5,8 @@ pub struct Screen {
     pub workspaces: Vec<Workspace>,
     pub current_wk: usize,
     pub root: x::Window,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl Screen {
@@ -52,10 +54,23 @@ impl Screen {
 
         lapin.x_connection.flush().ok();
 
+        // get width and height
+        let cookie = lapin.x_connection.send_request(&x::GetGeometry {
+            drawable: x::Drawable::Window(root),
+        });
+        let reply = lapin
+            .x_connection
+            .wait_for_reply(cookie)
+            .expect("Failed to get screen geometry");
+        let width = reply.width() as u32;
+        let height = reply.height() as u32;
+
         Screen {
             workspaces,
             root,
             current_wk: 0,
+            width,
+            height,
         }
     }
 

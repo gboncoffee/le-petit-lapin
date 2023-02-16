@@ -22,7 +22,7 @@ fn main() {
 
     lapin.config.mouse_mod = &[MODKEY];
 
-    lapin.config.layouts = layouts![Floating::new(), Maximized::new(1280, 800)];
+    lapin.config.layouts = layouts![Floating::new(), Maximized::new()];
 
     lapin.init(&mut keybinds);
 }
