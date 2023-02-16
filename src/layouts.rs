@@ -80,6 +80,7 @@ impl Layout for Floating {
 pub struct Maximized {
     pub name: &'static str,
     pub borders: u32,
+    pub gaps: u32,
 }
 
 impl Maximized {
@@ -87,6 +88,7 @@ impl Maximized {
         Maximized {
             name: "Maximized",
             borders: 0,
+            gaps: 0,
         }
     }
 }
@@ -107,10 +109,10 @@ impl Layout for Maximized {
     fn newwin(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32) {
         let window = *windows.next().unwrap();
         let list = [
-            x::ConfigWindow::X(0),
-            x::ConfigWindow::Y(0),
-            x::ConfigWindow::Width(width),
-            x::ConfigWindow::Height(height),
+            x::ConfigWindow::X((self.gaps) as i32),
+            x::ConfigWindow::Y((self.gaps) as i32),
+            x::ConfigWindow::Width(width - (self.gaps * 2) - (self.borders * 2)),
+            x::ConfigWindow::Height(height - (self.gaps * 2) - (self.borders * 2)),
         ];
         con.send_request(&x::ConfigureWindow {
             window,
@@ -119,10 +121,10 @@ impl Layout for Maximized {
     }
     fn reload(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32) {
         let list = [
-            x::ConfigWindow::X(0),
-            x::ConfigWindow::Y(0),
-            x::ConfigWindow::Width(width),
-            x::ConfigWindow::Height(height),
+            x::ConfigWindow::X((self.gaps + self.borders) as i32),
+            x::ConfigWindow::Y((self.gaps + self.borders) as i32),
+            x::ConfigWindow::Width(width - (self.gaps * 2) - (self.borders * 2)),
+            x::ConfigWindow::Height(height - (self.gaps * 2) - (self.borders * 2)),
         ];
         for window in windows {
             con.send_request(&x::ConfigureWindow {
