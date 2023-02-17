@@ -7,15 +7,26 @@ use xcb::x;
 pub type Callback = Box<dyn FnMut(&mut Lapin) -> ()>;
 
 pub fn match_butmask_with_modmask(modkey: x::KeyButMask) -> x::ModMask {
-    match modkey {
-        x::KeyButMask::SHIFT => x::ModMask::SHIFT,
-        x::KeyButMask::CONTROL => x::ModMask::CONTROL,
-        x::KeyButMask::LOCK => x::ModMask::LOCK,
-        x::KeyButMask::MOD1 => x::ModMask::N1,
-        x::KeyButMask::MOD2 => x::ModMask::N2,
-        x::KeyButMask::MOD4 => x::ModMask::N4,
-        _ => panic!("Please never create two types to represent the same fucking thing"),
+    let mut modmask = x::ModMask::empty();
+    if modkey.contains(x::KeyButMask::SHIFT) {
+        modmask = modmask | x::ModMask::SHIFT;
     }
+    if modkey.contains(x::KeyButMask::CONTROL) {
+        modmask = modmask | x::ModMask::CONTROL;
+    }
+    if modkey.contains(x::KeyButMask::LOCK) {
+        modmask = modmask | x::ModMask::LOCK;
+    }
+    if modkey.contains(x::KeyButMask::MOD1) {
+        modmask = modmask | x::ModMask::N1;
+    }
+    if modkey.contains(x::KeyButMask::MOD2) {
+        modmask = modmask | x::ModMask::N2;
+    }
+    if modkey.contains(x::KeyButMask::MOD4) {
+        modmask = modmask | x::ModMask::N4;
+    }
+    modmask
 }
 
 /// Matches a modkey name with it's mod mask value.

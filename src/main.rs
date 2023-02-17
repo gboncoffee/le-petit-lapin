@@ -18,7 +18,7 @@ fn main() {
         (&[MODKEY], "j", lazy! {wm, wm.nextwin()}),
         (&[MODKEY], "k", lazy! {wm, wm.prevwin()}),
         (&[MODKEY], "space", lazy! {wm, wm.next_layout()}),
-        (&[MODKEY, "Shift"], "space", lazy! {wm, wm.next_layout()}),
+        (&[MODKEY, "Shift"], "space", lazy! {wm, wm.prev_layout()}),
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];
