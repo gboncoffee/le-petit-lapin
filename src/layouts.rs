@@ -213,8 +213,8 @@ impl Layout for Maximized {
         let list = [
             x::ConfigWindow::X((self.gaps) as i32),
             x::ConfigWindow::Y((self.gaps) as i32),
-            x::ConfigWindow::Width(width - (self.gaps * 2) - (self.borders * 2)),
-            x::ConfigWindow::Height(height - (self.gaps * 2) - (self.borders * 2)),
+            x::ConfigWindow::Width(width - (self.gaps * 4) - (self.borders * 2)),
+            x::ConfigWindow::Height(height - (self.gaps * 4) - (self.borders * 2)),
         ];
         con.send_request(&x::ConfigureWindow {
             window,
@@ -225,8 +225,8 @@ impl Layout for Maximized {
         let list = [
             x::ConfigWindow::X((self.gaps + self.borders) as i32),
             x::ConfigWindow::Y((self.gaps + self.borders) as i32),
-            x::ConfigWindow::Width(width - (self.gaps * 2) - (self.borders * 2)),
-            x::ConfigWindow::Height(height - (self.gaps * 2) - (self.borders * 2)),
+            x::ConfigWindow::Width(width - (self.gaps * 4) - (self.borders * 2)),
+            x::ConfigWindow::Height(height - (self.gaps * 4) - (self.borders * 2)),
         ];
         for window in windows {
             con.send_request(&x::ConfigureWindow {
