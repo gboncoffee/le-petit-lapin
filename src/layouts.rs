@@ -133,7 +133,7 @@ impl Layout for Tiling {
                 value_list: &list,
             });
             let n_slave_wins = n_wins - 1;
-            let x = width - (((width as f32) * self.master_factor) as u32);
+            let x = ((width as f32) * self.master_factor) as u32;
             let width = width - (((width as f32) * self.master_factor) as u32) - (self.borders * 2);
             let height =
                 (height - (self.borders * 2 * (n_slave_wins as u32))) / (n_slave_wins as u32);

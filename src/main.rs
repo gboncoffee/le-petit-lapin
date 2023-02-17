@@ -23,7 +23,22 @@ fn main() {
 
     lapin.config.mouse_mod = &[MODKEY];
 
-    lapin.config.layouts = layouts![Tiling::new(), Maximized::new(), Floating::new()];
+    let tile = Tiling {
+        name: "tile",
+        borders: 1,
+        master_factor: 1.0 / 2.0,
+    };
+    let max = Maximized {
+        name: "max",
+        borders: 4,
+        gaps: 4,
+    };
+    let float = Floating {
+        name: "float",
+        borders: 4,
+    };
+
+    lapin.config.layouts = layouts![tile, max, float];
 
     // Lapin::spawn("picom");
 
