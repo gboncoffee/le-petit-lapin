@@ -303,14 +303,19 @@ impl Lapin {
     }
 
     fn change_layout(&mut self, previous: bool) {
-        let l = if self.current_workspace().layout == 0 {
-            self.config.layouts.len() - 1
-        } else if self.current_workspace().layout == self.config.layouts.len() - 1 {
-            0
-        } else if previous {
-            self.current_workspace().layout - 1
+        let new_n = if previous {
+            if self.current_workspace().layout == 0 {
+                self.config.layouts.len() - 1
+            } else {
+                self.current_workspace().layout - 1
+            }
         } else {
             self.current_workspace().layout + 1
+        };
+        let l = if new_n >= self.config.layouts.len() {
+            0
+        } else {
+            new_n
         };
 
         let s = self.current_scr;
@@ -336,6 +341,7 @@ impl Lapin {
             self.current_screen().width,
             self.current_screen().height,
         );
+        self.x_connection.flush().ok();
     }
 
     /// The main event loop of the window manager.
