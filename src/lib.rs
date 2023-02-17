@@ -9,6 +9,7 @@ use config::*;
 use keys::*;
 use screens::*;
 use std::fmt;
+use std::time;
 use xcb::x;
 use xcb::Connection;
 
@@ -124,7 +125,6 @@ impl Lapin {
                 x::Cw::BorderPixel(self.config.border_color),
                 x::Cw::EventMask(
                     x::EventMask::ENTER_WINDOW
-                        | x::EventMask::LEAVE_WINDOW
                         | x::EventMask::PROPERTY_CHANGE
                         | x::EventMask::STRUCTURE_NOTIFY,
                 ),
@@ -132,6 +132,9 @@ impl Lapin {
         });
 
         self.add_border(ev.window());
+        if let Some(old_win) = self.get_focused_window() {
+            self.restore_border(old_win);
+        }
 
         let scr = self.current_scr;
         let wk = self.screens[scr].current_wk;
@@ -149,6 +152,10 @@ impl Lapin {
         self.x_connection.send_request(&x::MapWindow {
             window: ev.window(),
         });
+
+        self.x_connection.flush().ok();
+
+        self.set_focus(ev.window(), scr, wk, 0);
 
         self.x_connection.flush().ok();
     }
@@ -352,13 +359,26 @@ impl Lapin {
         let mut pos_x = None;
         let mut pos_y = None;
         let mut move_window = None;
+        // gambiarra to solve the problem of input when mapping windows
+        let mut last_map = time::SystemTime::now();
 
         loop {
             match utils::get_x_event(&self.x_connection) {
-                x::Event::MapRequest(ev) => self.manage_window(ev),
+                x::Event::MapRequest(ev) => {
+                    last_map = time::SystemTime::now();
+                    self.manage_window(ev);
+                }
                 x::Event::DestroyNotify(ev) => self.unmanage_window(ev.window()),
-                x::Event::EnterNotify(ev) => self.toggle_focus(ev.event()),
-                x::Event::LeaveNotify(ev) => self.restore_border(ev.event()),
+                x::Event::EnterNotify(ev) => {
+                    if time::SystemTime::now().duration_since(last_map).unwrap()
+                        > time::Duration::from_millis(100)
+                    {
+                        if let Some(old_win) = self.get_focused_window() {
+                            self.restore_border(old_win);
+                        }
+                        self.toggle_focus(ev.event());
+                    }
+                }
                 x::Event::KeyPress(ev) => {
                     if let Some(callback) = keybinds.get_callback(ev.detail(), ev.state()) {
                         callback(self);
@@ -385,7 +405,6 @@ impl Lapin {
                         }
                     }
                 }
-                // other => println!("{:?}", other),
                 _ => {}
             }
         }
