@@ -81,6 +81,7 @@ pub struct Tiling {
     pub name: &'static str,
     pub borders: u32,
     pub master_factor: f32,
+    pub gaps: u32,
 }
 
 impl Tiling {
@@ -89,6 +90,7 @@ impl Tiling {
             name: "Tiling",
             borders: 4,
             master_factor: 1.0 / 2.0,
+            gaps: 4,
         }
     }
 }
@@ -110,10 +112,10 @@ impl Layout for Tiling {
             return;
         } else if n_wins == 1 {
             let list = [
-                x::ConfigWindow::X(0),
-                x::ConfigWindow::Y(0),
-                x::ConfigWindow::Width(width - (self.borders * 2)),
-                x::ConfigWindow::Height(height - (self.borders * 2)),
+                x::ConfigWindow::X(self.gaps as i32),
+                x::ConfigWindow::Y(self.gaps as i32),
+                x::ConfigWindow::Width(width - (self.gaps * 2) - (self.borders * 2)),
+                x::ConfigWindow::Height(height - (self.gaps * 2) - (self.borders * 2)),
             ];
             con.send_request(&x::ConfigureWindow {
                 window: *windows.next().unwrap(),
@@ -121,24 +123,29 @@ impl Layout for Tiling {
             });
         } else {
             let list = [
-                x::ConfigWindow::X(0),
-                x::ConfigWindow::Y(0),
+                x::ConfigWindow::X(self.gaps as i32),
+                x::ConfigWindow::Y(self.gaps as i32),
                 x::ConfigWindow::Width(
-                    (((width as f32) * self.master_factor) as u32) - (self.borders * 2),
+                    (((width as f32) * self.master_factor) as u32)
+                        - (((self.gaps as f32) * 1.5) as u32)
+                        - (self.borders * 2),
                 ),
-                x::ConfigWindow::Height(height - (self.borders * 2)),
+                x::ConfigWindow::Height(height - (self.gaps * 2) - (self.borders * 2)),
             ];
             con.send_request(&x::ConfigureWindow {
                 window: *windows.next().unwrap(),
                 value_list: &list,
             });
             let n_slave_wins = n_wins - 1;
-            let x = ((width as f32) * self.master_factor) as u32;
-            let width = width - (((width as f32) * self.master_factor) as u32) - (self.borders * 2);
-            let height =
-                (height - (self.borders * 2 * (n_slave_wins as u32))) / (n_slave_wins as u32);
+            let x = (((width as f32) * self.master_factor) as u32) + (self.gaps / 2);
+            let width = (width / 2) - (((self.gaps as f32) * 1.5) as u32) - (self.borders * 2);
+            let height = (height
+                - (self.gaps * (n_slave_wins + 1) as u32)
+                - (self.borders * 2 * (n_slave_wins as u32)))
+                / (n_slave_wins as u32);
             for (n, window) in windows.enumerate() {
-                let y = height * (n as u32) + (self.borders * 2 * (n as u32));
+                let y = (height * (n as u32) + (self.borders * 2 * (n as u32)))
+                    + (self.gaps * ((n + 1) as u32));
                 let list = [
                     x::ConfigWindow::X(x as i32),
                     x::ConfigWindow::Y(y as i32),

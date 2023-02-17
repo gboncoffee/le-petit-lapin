@@ -25,8 +25,9 @@ fn main() {
 
     let tile = Tiling {
         name: "tile",
-        borders: 1,
+        borders: 4,
         master_factor: 1.0 / 2.0,
+        gaps: 4,
     };
     let max = Maximized {
         name: "max",
