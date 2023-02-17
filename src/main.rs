@@ -18,11 +18,12 @@ fn main() {
         (&[MODKEY], "j", lazy! {wm, wm.nextwin()}),
         (&[MODKEY], "k", lazy! {wm, wm.prevwin()}),
         (&[MODKEY], "space", lazy! {wm, wm.next_layout()}),
+        (&[MODKEY, "Shift"], "space", lazy! {wm, wm.next_layout()}),
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];
 
-    lapin.config.layouts = layouts![Floating::new(), Maximized::new()];
+    lapin.config.layouts = layouts![Tiling::new(), Maximized::new(), Floating::new()];
 
     lapin.init(&mut keybinds);
 }
