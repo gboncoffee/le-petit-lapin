@@ -25,5 +25,7 @@ fn main() {
 
     lapin.config.layouts = layouts![Tiling::new(), Maximized::new(), Floating::new()];
 
+    // Lapin::spawn("picom");
+
     lapin.init(&mut keybinds);
 }

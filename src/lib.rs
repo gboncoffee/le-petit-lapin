@@ -12,25 +12,7 @@ use std::fmt;
 use std::time;
 use xcb::x;
 use xcb::Connection;
-
-xcb::atoms_struct! {
-    #[derive(Copy, Clone, Debug)]
-    /// Atoms struct for the window manager.
-    pub(crate) struct Atoms {
-        pub wm_protocols => b"WM_PROTOCOLS" only_if_exists = false,
-        pub wm_del_window => b"WM_DELETE_WINDOW" only_if_exists = false,
-        pub wm_state => b"WM_STATE" only_if_exists = false,
-        pub wm_take_focus => b"WM_TAKE_FOCUS" only_if_exists = false,
-        pub net_active_window => b"_NET_ACTIVE_WINDOW" only_if_exists = false,
-        pub net_supported => b"_NET_SUPPORTED" only_if_exists = false,
-        pub net_wm_name => b"_NET_WM_NAME" only_if_exists = false,
-        pub net_wm_state => b"_NET_WM_STATE" only_if_exists = false,
-        pub net_wm_fullscreen => b"_NET_WM_STATE_FULLSCREEN" only_if_exists = false,
-        pub net_wm_window_type => b"_NET_WM_WINDOW_TYPE" only_if_exists = false,
-        pub net_wm_window_type_dialog => b"_NET_WM_WINDOW_TYPE_DIALOG" only_if_exists = false,
-        pub net_client_list => b"_NET_CLIENT_LIST" only_if_exists = false,
-    }
-}
+use xcb::Xid;
 
 /// The window manager I suppose.
 pub struct Lapin {
@@ -39,7 +21,6 @@ pub struct Lapin {
     pub keybinds: KeybindSet,
     pub screens: Vec<Screen>,
     current_scr: usize,
-    atoms: Option<Atoms>,
 }
 
 impl fmt::Display for Lapin {
@@ -78,7 +59,6 @@ impl Lapin {
             screens,
             current_scr: current_scr as usize,
             keybinds,
-            atoms: None,
         }
     }
 
@@ -118,6 +98,16 @@ impl Lapin {
         });
     }
 
+    fn add_client_to_atom(&self, window: x::Window) {
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Append,
+            window: self.current_screen().root,
+            property: self.current_screen().atoms.net_client_list,
+            r#type: self.current_screen().atoms.net_client_list,
+            data: &window.resource_id().to_ne_bytes(),
+        });
+    }
+
     fn manage_window(&mut self, ev: x::MapRequestEvent) {
         self.x_connection.send_request(&x::ChangeWindowAttributes {
             window: ev.window(),
@@ -153,6 +143,8 @@ impl Lapin {
             window: ev.window(),
         });
 
+        self.add_client_to_atom(ev.window());
+
         self.x_connection.flush().ok();
 
         self.set_focus(ev.window(), scr, wk, 0);
@@ -164,10 +156,31 @@ impl Lapin {
         if let Some((s, k, w)) = self.window_location(window) {
             self.screens[s].workspaces[k].windows.remove(w);
             self.screens[s].workspaces[k].focused = None;
+            self.current_layout().delwin(
+                &mut self.workspace_windows(),
+                self.current_workspace().focused,
+                &self.x_connection,
+                self.current_screen().width,
+                self.current_screen().height,
+            );
+            self.x_connection.send_request(&x::ChangeProperty::<u8> {
+                mode: x::PropMode::Replace,
+                window: self.current_screen().root,
+                property: self.current_screen().atoms.net_client_list,
+                r#type: self.current_screen().atoms.net_client_list,
+                data: &[],
+            });
+            self.x_connection.flush().ok();
+            let iter = self.current_screen().workspaces.iter();
+            for wk in iter {
+                for window in wk.windows.iter() {
+                    self.add_client_to_atom(*window);
+                }
+            }
             let n_wins = self.screens[s].workspaces[k].windows.len();
             if n_wins > 0 {
                 let win = if w != 0 {
-                    if w == n_wins {
+                    if w >= n_wins {
                         w - 1
                     } else {
                         w
@@ -176,14 +189,8 @@ impl Lapin {
                     0
                 };
                 self.set_focus(self.screens[s].workspaces[k].windows[win], s, k, win);
+                self.x_connection.flush().ok();
             }
-            self.current_layout().delwin(
-                &mut self.workspace_windows(),
-                self.current_workspace().focused,
-                &self.x_connection,
-                self.current_screen().width,
-                self.current_screen().height,
-            );
         }
     }
 
@@ -368,7 +375,10 @@ impl Lapin {
                     last_map = time::SystemTime::now();
                     self.manage_window(ev);
                 }
-                x::Event::DestroyNotify(ev) => self.unmanage_window(ev.window()),
+                x::Event::DestroyNotify(ev) => {
+                    last_map = time::SystemTime::now();
+                    self.unmanage_window(ev.window());
+                }
                 x::Event::EnterNotify(ev) => {
                     if time::SystemTime::now().duration_since(last_map).unwrap()
                         > time::Duration::from_millis(100)

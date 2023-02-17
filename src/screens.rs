@@ -1,12 +1,32 @@
 use crate::*;
 use xcb::x;
 
+xcb::atoms_struct! {
+    #[derive(Copy, Clone, Debug)]
+    /// Atoms struct for the window manager.
+    pub struct Atoms {
+        pub wm_protocols => b"WM_PROTOCOLS" only_if_exists = false,
+        pub wm_del_window => b"WM_DELETE_WINDOW" only_if_exists = false,
+        pub wm_state => b"WM_STATE" only_if_exists = false,
+        pub wm_take_focus => b"WM_TAKE_FOCUS" only_if_exists = false,
+        pub net_active_window => b"_NET_ACTIVE_WINDOW" only_if_exists = false,
+        pub net_supported => b"_NET_SUPPORTED" only_if_exists = false,
+        pub net_wm_name => b"_NET_WM_NAME" only_if_exists = false,
+        pub net_wm_state => b"_NET_WM_STATE" only_if_exists = false,
+        pub net_wm_fullscreen => b"_NET_WM_STATE_FULLSCREEN" only_if_exists = false,
+        pub net_wm_window_type => b"_NET_WM_WINDOW_TYPE" only_if_exists = false,
+        pub net_wm_window_type_dialog => b"_NET_WM_WINDOW_TYPE_DIALOG" only_if_exists = false,
+        pub net_client_list => b"_NET_CLIENT_LIST" only_if_exists = false,
+    }
+}
+
 pub struct Screen {
     pub workspaces: Vec<Workspace>,
     pub current_wk: usize,
     pub root: x::Window,
     pub width: u32,
     pub height: u32,
+    pub atoms: Atoms,
 }
 
 impl Screen {
@@ -65,12 +85,15 @@ impl Screen {
         let width = reply.width() as u32;
         let height = reply.height() as u32;
 
+        let atoms = Atoms::intern_all(&lapin.x_connection).expect("Cannot init atoms!");
+
         Screen {
             workspaces,
             root,
             current_wk: 0,
             width,
             height,
+            atoms,
         }
     }
 

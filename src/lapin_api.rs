@@ -1,6 +1,5 @@
 use crate::keys::KeybindSet;
 use crate::screens::Screen;
-use crate::Atoms;
 use crate::Lapin;
 use std::process;
 use xcb::x;
@@ -11,8 +10,6 @@ impl Lapin {
             self.screens
                 .push(Screen::new(&self, screen.root(), keybinds));
         }
-
-        self.atoms = Some(Atoms::intern_all(&self.x_connection).expect("Cannot init atoms!"));
 
         self.main_event_loop(keybinds);
     }
