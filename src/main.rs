@@ -10,6 +10,15 @@ fn main() {
 
     let mut keybinds = KeybindSet::new();
     keybinds.bindall(vec![
+        (&[MODKEY], "1", lazy! {wm, wm.goto_workspace(1)}),
+        (&[MODKEY], "2", lazy! {wm, wm.goto_workspace(2)}),
+        (&[MODKEY], "3", lazy! {wm, wm.goto_workspace(3)}),
+        (&[MODKEY], "4", lazy! {wm, wm.goto_workspace(4)}),
+        (&[MODKEY], "5", lazy! {wm, wm.goto_workspace(5)}),
+        (&[MODKEY], "6", lazy! {wm, wm.goto_workspace(6)}),
+        (&[MODKEY], "7", lazy! {wm, wm.goto_workspace(7)}),
+        (&[MODKEY], "8", lazy! {wm, wm.goto_workspace(8)}),
+        (&[MODKEY], "9", lazy! {wm, wm.goto_workspace(9)}),
         (&[MODKEY], "q", lazy! {Lapin::quit()}),
         (&[MODKEY], "Return", lazy! {Lapin::spawn(TERMINAL)}),
         (&[MODKEY], "n", lazy! {Lapin::spawn("chromium")}),

@@ -45,23 +45,6 @@ impl fmt::Display for Lapin {
 }
 
 impl Lapin {
-    /// The first function that should be called: to connect the window manager
-    /// to the X server.
-    pub fn connect() -> Self {
-        let (x_connection, current_scr) =
-            Connection::connect(None).expect("Cannot connect to the X server!");
-        let config = Config::new();
-        let screens = Vec::new();
-        let keybinds = KeybindSet::new();
-        Lapin {
-            x_connection,
-            config,
-            screens,
-            current_scr: current_scr as usize,
-            keybinds,
-        }
-    }
-
     fn window_location(&self, win: x::Window) -> Option<(usize, usize, usize)> {
         for (s, screen) in self.screens.iter().enumerate() {
             for (k, workspace) in screen.workspaces.iter().enumerate() {
@@ -108,7 +91,46 @@ impl Lapin {
         });
     }
 
+    fn change_workspace(&mut self, wk: usize) {
+        for window in self.workspace_windows() {
+            self.x_connection
+                .send_request(&x::UnmapWindow { window: *window });
+        }
+        self.screens[self.current_scr].current_wk = wk;
+        for window in self.workspace_windows() {
+            self.x_connection
+                .send_request(&x::MapWindow { window: *window });
+        }
+        self.x_connection.flush().ok();
+        if let Some(focus) = self.current_workspace().focused {
+            self.x_connection.send_request(&x::SetInputFocus {
+                revert_to: x::InputFocus::PointerRoot,
+                focus: self.current_workspace().windows[focus],
+                time: x::CURRENT_TIME,
+            });
+        } else {
+            self.x_connection.send_request(&x::SetInputFocus {
+                revert_to: x::InputFocus::PointerRoot,
+                focus: self.current_screen().root,
+                time: x::CURRENT_TIME,
+            });
+        }
+        self.x_connection.flush().ok();
+    }
+
     fn manage_window(&mut self, ev: x::MapRequestEvent) {
+        let cookie = self.x_connection.send_request(&x::GetWindowAttributes {
+            window: ev.window(),
+        });
+        let reply = self.x_connection.wait_for_reply(cookie);
+        if let Ok(reply) = reply {
+            if reply.override_redirect() {
+                return;
+            }
+        } else {
+            return;
+        }
+
         self.x_connection.send_request(&x::ChangeWindowAttributes {
             window: ev.window(),
             value_list: &[
