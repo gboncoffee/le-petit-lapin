@@ -37,6 +37,7 @@ fn main() {
         borders: 4,
         master_factor: 1.0 / 2.0,
         gaps: 4,
+        gaps_on_single: false,
     };
     let max = Maximized {
         name: "max",

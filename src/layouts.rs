@@ -82,6 +82,7 @@ pub struct Tiling {
     pub borders: u32,
     pub master_factor: f32,
     pub gaps: u32,
+    pub gaps_on_single: bool,
 }
 
 impl Tiling {
@@ -91,6 +92,7 @@ impl Tiling {
             borders: 4,
             master_factor: 1.0 / 2.0,
             gaps: 4,
+            gaps_on_single: true,
         }
     }
 }
@@ -111,11 +113,20 @@ impl Layout for Tiling {
         if n_wins == 0 {
             return;
         } else if n_wins == 1 {
+            let (pos, w, h) = if self.gaps_on_single {
+                (
+                    self.gaps as i32,
+                    width - (self.gaps * 2) - (self.borders * 2),
+                    height - (self.gaps * 2) - (self.borders * 2),
+                )
+            } else {
+                (-(self.borders as i32), width, height)
+            };
             let list = [
-                x::ConfigWindow::X(self.gaps as i32),
-                x::ConfigWindow::Y(self.gaps as i32),
-                x::ConfigWindow::Width(width - (self.gaps * 2) - (self.borders * 2)),
-                x::ConfigWindow::Height(height - (self.gaps * 2) - (self.borders * 2)),
+                x::ConfigWindow::X(pos),
+                x::ConfigWindow::Y(pos),
+                x::ConfigWindow::Width(w),
+                x::ConfigWindow::Height(h),
             ];
             con.send_request(&x::ConfigureWindow {
                 window: *windows.next().unwrap(),
