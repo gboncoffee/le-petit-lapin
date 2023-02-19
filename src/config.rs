@@ -14,8 +14,8 @@ impl Config {
         Config {
             workspaces: &["1", "2", "3", "4", "5", "6", "7", "8", "9"],
             mouse_mod: &["Super"],
-            border_color: 0x000000,
-            border_color_focus: 0xffffff,
+            border_color: 0xff000000,
+            border_color_focus: 0xffffffff,
             layouts: vec![Box::new(Floating::new())],
         }
     }

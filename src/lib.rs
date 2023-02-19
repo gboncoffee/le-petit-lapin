@@ -119,6 +119,10 @@ impl Lapin {
     }
 
     fn manage_window(&mut self, ev: x::MapRequestEvent) {
+        if self.window_location(ev.window()).is_some() {
+            return;
+        }
+
         let cookie = self.x_connection.send_request(&x::GetWindowAttributes {
             window: ev.window(),
         });
