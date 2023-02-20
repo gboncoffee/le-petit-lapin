@@ -77,6 +77,132 @@ impl Lapin {
         }
     }
 
+    pub fn rotate_windows_up(&mut self) {
+        if let Some(cur_w) = self.current_workspace().focused {
+            let s = self.current_scr;
+            let k = self.current_screen().current_wk;
+            self.screens[s].workspaces[k].windows.rotate_left(1);
+            self.current_layout().reload(
+                &mut self.workspace_windows(),
+                &self.x_connection,
+                self.current_screen().width,
+                self.current_screen().height,
+            );
+            self.screens[s].workspaces[k].focused = if cur_w == 0 {
+                Some(self.current_workspace().windows.len() - 1)
+            } else {
+                Some(cur_w - 1)
+            };
+        }
+    }
+
+    pub fn rotate_windows_down(&mut self) {
+        if let Some(cur_w) = self.current_workspace().focused {
+            let s = self.current_scr;
+            let k = self.current_screen().current_wk;
+            self.screens[s].workspaces[k].windows.rotate_right(1);
+            self.current_layout().reload(
+                &mut self.workspace_windows(),
+                &self.x_connection,
+                self.current_screen().width,
+                self.current_screen().height,
+            );
+            self.screens[s].workspaces[k].focused =
+                if cur_w == self.current_workspace().windows.len() - 1 {
+                    Some(0)
+                } else {
+                    Some(cur_w + 1)
+                };
+        }
+    }
+
+    pub fn swap_with_next_slave(&mut self) {
+        if let Some(cur_w) = self.current_workspace().focused {
+            if cur_w == 0 {
+                return;
+            }
+
+            let s = self.current_scr;
+            let k = self.current_screen().current_wk;
+
+            let next_w = if cur_w == self.current_workspace().windows.len() - 1 {
+                1
+            } else {
+                cur_w + 1
+            };
+
+            let tmp = self.current_workspace().windows[cur_w];
+            self.screens[s].workspaces[k].windows[cur_w] =
+                self.screens[s].workspaces[k].windows[next_w];
+            self.screens[s].workspaces[k].windows[next_w] = tmp;
+
+            self.screens[s].workspaces[k].focused = Some(next_w);
+
+            self.current_layout().reload(
+                &mut self.workspace_windows(),
+                &self.x_connection,
+                self.current_screen().width,
+                self.current_screen().height,
+            );
+        }
+    }
+
+    pub fn swap_with_prev_slave(&mut self) {
+        if let Some(cur_w) = self.current_workspace().focused {
+            if cur_w == 0 {
+                return;
+            }
+
+            let s = self.current_scr;
+            let k = self.current_screen().current_wk;
+
+            let prev_w = if cur_w == 1 {
+                self.current_workspace().windows.len() - 1
+            } else {
+                cur_w - 1
+            };
+
+            let tmp = self.current_workspace().windows[cur_w];
+            self.screens[s].workspaces[k].windows[cur_w] =
+                self.screens[s].workspaces[k].windows[prev_w];
+            self.screens[s].workspaces[k].windows[prev_w] = tmp;
+
+            self.screens[s].workspaces[k].focused = Some(prev_w);
+
+            self.current_layout().reload(
+                &mut self.workspace_windows(),
+                &self.x_connection,
+                self.current_screen().width,
+                self.current_screen().height,
+            );
+        }
+    }
+
+    pub fn change_master(&mut self) {
+        if self.current_workspace().windows.len() < 2 {
+            return;
+        }
+
+        if let Some(cur_w) = self.current_workspace().focused {
+            let s = self.current_scr;
+            let k = self.current_screen().current_wk;
+
+            let other_w = if cur_w == 0 { 1 } else { 0 };
+
+            let tmp = self.current_workspace().windows[cur_w];
+            self.screens[s].workspaces[k].windows[cur_w] =
+                self.screens[s].workspaces[k].windows[other_w];
+            self.screens[s].workspaces[k].windows[other_w] = tmp;
+            self.screens[s].workspaces[k].focused = Some(other_w);
+            self.current_layout().reload(
+                &mut self.workspace_windows(),
+                &self.x_connection,
+                self.current_screen().width,
+                self.current_screen().height,
+            );
+        }
+    }
+
     /// Function to spawn a command.
     pub fn spawn(s: &str) {
         let mut iter = s.split_whitespace();
