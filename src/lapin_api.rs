@@ -1,3 +1,5 @@
+//! This module defines a bunch of useful public functions to the `Lapin`
+//! struct. Check then on docs for `lapin::Lapin`.
 use crate::config::Config;
 use crate::keys::KeybindSet;
 use crate::screens::Screen;
@@ -24,6 +26,8 @@ impl Lapin {
         }
     }
 
+    /// The last function that should be called, because it'll start the main
+    /// loop and bind keys, efectively never returning.
     pub fn init(&mut self, keybinds: &mut KeybindSet) {
         for screen in self.x_connection.get_setup().roots() {
             self.screens
@@ -39,6 +43,7 @@ impl Lapin {
         self.main_event_loop(keybinds);
     }
 
+    /// Returns the id of the currently focused window.
     pub fn get_focused_window(&self) -> Option<x::Window> {
         let s = self.current_scr;
         let k = self.screens[s].current_wk;
@@ -49,34 +54,41 @@ impl Lapin {
         }
     }
 
+    /// Kills the currently focused window.
     pub fn killfocused(&mut self) {
         let Some(window) = self.get_focused_window() else { return };
         self.x_connection.send_request(&x::DestroyWindow { window });
         self.x_connection.flush().ok();
     }
 
+    /// Changes the focus to the next window of the current workspace.
     pub fn nextwin(&mut self) {
         self.change_win(false);
     }
 
+    /// Changes the focus to the previous window of the current workspace.
     pub fn prevwin(&mut self) {
         self.change_win(true);
     }
 
+    /// Changes to the next layout of the current workspace.
     pub fn next_layout(&mut self) {
         self.change_layout(false);
     }
 
+    /// Changes to the previous layout of the current workspace.
     pub fn prev_layout(&mut self) {
         self.change_layout(true);
     }
 
+    /// Change current workspace.
     pub fn goto_workspace(&mut self, wk: usize) {
         if (wk - 1) < self.current_screen().workspaces.len() {
             self.change_workspace(wk - 1);
         }
     }
 
+    /// Rotate the current workspace stack up.
     pub fn rotate_windows_up(&mut self) {
         if let Some(cur_w) = self.current_workspace().focused {
             let s = self.current_scr;
@@ -96,6 +108,7 @@ impl Lapin {
         }
     }
 
+    /// Rotate the current workspace stack down.
     pub fn rotate_windows_down(&mut self) {
         if let Some(cur_w) = self.current_workspace().focused {
             let s = self.current_scr;
@@ -116,6 +129,7 @@ impl Lapin {
         }
     }
 
+    /// Swaps the current window with the next slave window.
     pub fn swap_with_next_slave(&mut self) {
         if let Some(cur_w) = self.current_workspace().focused {
             if cur_w == 0 {
@@ -147,6 +161,7 @@ impl Lapin {
         }
     }
 
+    /// Swaps the current window with the previous slave window.
     pub fn swap_with_prev_slave(&mut self) {
         if let Some(cur_w) = self.current_workspace().focused {
             if cur_w == 0 {
@@ -178,6 +193,8 @@ impl Lapin {
         }
     }
 
+    /// Changes current window with the master window, or changes the master
+    /// window with the first slave window.
     pub fn change_master(&mut self) {
         if self.current_workspace().windows.len() < 2 {
             return;
@@ -203,7 +220,8 @@ impl Lapin {
         }
     }
 
-    /// Function to spawn a command.
+    /// Runs a system command. Arguments must be separated by spaces.
+    /// Note that it DOES NOT runs it inside a shell.
     pub fn spawn(s: &str) {
         let mut iter = s.split_whitespace();
         if let Some(prog) = iter.next() {
@@ -215,7 +233,7 @@ impl Lapin {
         }
     }
 
-    /// Function to terminate the window manager process.
+    /// Terminate the window manager process.
     pub fn quit() {
         process::exit(0);
     }

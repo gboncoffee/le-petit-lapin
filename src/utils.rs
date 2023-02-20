@@ -1,5 +1,6 @@
 use xcb;
 
+/// Gets the next X event, ignoring errors.
 pub fn get_x_event(con: &xcb::Connection) -> xcb::x::Event {
     loop {
         if let Ok(event) = con.wait_for_event() {

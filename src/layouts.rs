@@ -1,9 +1,18 @@
+//! Default layouts for the window manager and a trait to create new
+//! ones.
+
 use std::slice::Iter;
 use xcb::x;
 use xcb::Connection;
 
+/// A trait that defines a layout of the window manager. Layouts are
+/// responsible to send requests to change windows size and position. They're
+/// free to do anything, but to better suit with the window manager itself,
+/// they should stick to just changing windows size and position.
 pub trait Layout {
+    /// Called when a window is mapped, except when changing workspaces.
     fn newwin(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32);
+    /// Called when a window is unmaped, except when changing workspaces.
     fn delwin(
         &self,
         windows: &mut Iter<x::Window>,
@@ -12,7 +21,10 @@ pub trait Layout {
         width: u32,
         height: u32,
     );
+    /// Called any time some action requires a full reload of the windows size
+    /// and/or position, such as changing workspaces or layouts.
     fn reload(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32);
+    /// Called when the focus was changed.
     fn changewin(
         &self,
         windows: &mut Iter<x::Window>,
@@ -22,18 +34,31 @@ pub trait Layout {
         width: u32,
         height: u32,
     );
+    /// The window manager calls this function when a mouse motion is
+    /// performed to check if it should allow it to move and/or resize windows.
+    /// Layouts will generally just return `false` unless they're a floating
+    /// layout.
     fn allow_motions(&self) -> bool;
+    /// The window manager calls this function to get the border size it should
+    /// set to windows. Layouts should return 0 to no border.
     fn border_width(&self) -> u32;
 
+    /// Returns the layout name. It's recommended to leave the name as a free
+    /// choice of the user.
     fn name(&self) -> &'static str;
 }
 
+/// A floating layout. Does nothing with the windows and allows motions.
+/// Supports optional borders.
 pub struct Floating {
     pub borders: u32,
     pub name: &'static str,
 }
 
 impl Floating {
+    /// Returns a new floating layout with default configs:
+    /// - 4 pixels for borders;
+    /// - "Floating" as the name.
     pub fn new() -> Self {
         Floating {
             borders: 4,
@@ -77,15 +102,26 @@ impl Layout for Floating {
     }
 }
 
+/// A tiling layout, similar to DWM. Supports optional gaps and borders.
 pub struct Tiling {
     pub name: &'static str,
     pub borders: u32,
+    /// Ratio of the screen used by the master window. Ranges from 0 to 1.
     pub master_factor: f32,
+    /// Gaps around and between the windows.
     pub gaps: u32,
+    /// If gaps and borders should be drawn when there's only one window in the
+    /// stack.
     pub gaps_on_single: bool,
 }
 
 impl Tiling {
+    /// Creates a new tiling layout with default configs:
+    /// - 4 pixels for borders;
+    /// - 1/2 (0.5) of master factor;
+    /// - 4 pixels for gaps;
+    /// - Gaps on single set to true;
+    /// - "Tiling" as the name.
     pub fn new() -> Tiling {
         Tiling {
             name: "Tiling",
@@ -197,6 +233,8 @@ impl Layout for Tiling {
     }
 }
 
+/// A maximized (fullscreen) layout. Windows are drawn above each other.
+/// Supports optional gaps and borders. Use 0 to disable then.
 pub struct Maximized {
     pub name: &'static str,
     pub borders: u32,
@@ -204,6 +242,9 @@ pub struct Maximized {
 }
 
 impl Maximized {
+    /// Creates a new maximized layout with default configs:
+    /// - No borders nor gaps;
+    /// - "Maximized" as the name.
     pub fn new() -> Maximized {
         Maximized {
             name: "Maximized",
@@ -275,6 +316,32 @@ impl Layout for Maximized {
     }
 }
 
+/// Creates a Vec of layouts suitable for use with the window manager.
+///
+/// # Example
+///
+/// ```no_run
+/// use lapin::*;
+/// use lapin::layouts::*;
+/// let mut lapin = Lapin::connect();
+/// let tile = Tiling {
+///     name: "tile",
+///     borders: 4,
+///     master_factor: 1.0 / 2.0,
+///     gaps: 4,
+///     gaps_on_single: false,
+/// };
+/// let max = Maximized {
+///     name: "max",
+///     borders: 4,
+///     gaps: 4,
+/// };
+/// let float = Floating {
+///     name: "float",
+///     borders: 4,
+/// };
+/// lapin.config.layouts = layouts![tile, max, float];
+/// ```
 #[macro_export]
 macro_rules! layouts {
     ( $( $x:expr ),* ) => {

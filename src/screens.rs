@@ -20,6 +20,7 @@ xcb::atoms_struct! {
     }
 }
 
+/// Will be a physical screen when multi-monitor support arrive.
 pub struct Screen {
     pub workspaces: Vec<Workspace>,
     pub current_wk: usize,
@@ -30,6 +31,8 @@ pub struct Screen {
 }
 
 impl Screen {
+    /// Creates a screen. The `Lapin::init()` should call it for every monitor.
+    /// Only use it manually if you know what you're doing.
     pub fn new(lapin: &Lapin, root: x::Window, keybinds: &KeybindSet) -> Self {
         // bind keys.
         for ((modmask, _, code), _) in keybinds.iter() {
@@ -103,14 +106,17 @@ impl Screen {
     }
 }
 
+/// A virtual workspace.
 pub struct Workspace {
     pub name: &'static str,
     pub focused: Option<usize>,
     pub windows: Vec<x::Window>,
     pub layout: usize,
 }
-
 impl Workspace {
+    /// Creates a new workspace. The `Lapin::init()` function should create then
+    /// based in the config struct. Only create then manually if you know what
+    /// you're doing.
     pub fn new(name: &'static str) -> Self {
         Workspace {
             name,

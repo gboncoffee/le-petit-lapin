@@ -1,3 +1,126 @@
+//! Copyright (c) 2023 Gabriel G. de Brito
+//!
+//! Permission is hereby granted, free of charge, to any person obtaining a copy
+//! of this software and associated documentation files (the "Software"), to deal
+//! in the Software without restriction, including without limitation the rights
+//! to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//! copies of the Software, and to permit persons to whom the Software is
+//! furnished to do so, subject to the following conditions:
+//!
+//! The above copyright notice and this permission notice shall be included in all
+//! copies or substantial portions of the Software.
+//!
+//! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//! IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//! FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//! AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//! LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//! OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//! SOFTWARE.
+//!
+//! # Le Petit Lapin - The cute X window manager.
+//!
+//! Le Petit Lapin is a X window manager written in Rust as a library. One must
+//! create a binary Cargo crate that depends on `lapin` to build it with a desired
+//! configuration.
+//!
+//! The name "Le petit lapin" was choosen by a friend of mine and it means "The
+//! little bunny" in French, but I'm not 100% sure about that because I don't speak
+//! French.
+//!
+//! ## Quickstart
+//!
+//! To use Lapin is to write your own window manager in Rust, depending on this
+//! crate. A sample config would look like this:
+//! ```no_run
+//! use lapin::keys::*;
+//! use lapin::layouts::*;
+//! use lapin::*;
+//!
+//! fn main() {
+//!     // The first thing to do is always call Lapin::connect() to create a
+//!     // new Lapin object and connect to the X server.
+//!     let mut lapin = Lapin::connect();
+//!
+//!     // A good pratice is to define things you'll use a lot later as const.
+//!     const MODKEY: &str = "Meta";
+//!     const TERMINAL: &str = "alacritty";
+//!
+//!     // Some configurations are kept inside a Config struct, member of
+//!     // Lapin. "mouse_mod", for example, is the modifier we use with the
+//!     // mouse buttons to move windows around (with button 1) and resize then
+//!     // (with button 2).
+//!     lapin.config.mouse_mod = MODKEY;
+//!     // The workspaces number and name are handled here too. By default,
+//!     // they're 9 workspaces named as numbers from 1 to 9. In this example,
+//!     // we'll use 3:
+//!     lapin.config.workspaces = &["dev", "web", "sys"];
+//!
+//!     // Border colors are also handled here. They're u32 numbers in the form
+//!     // ARGB.
+//!                                      // A R G B
+//!     lapin.config.border_color       = 0xff000000;
+//!     lapin.config.border_color_focus = 0xffffffff;
+//!
+//!     // Keybinds are handled by the main_loop function, separately from the
+//!     // window manager struct. We create a new empty set then bind some keys
+//!     // to it:
+//!     let mut keybinds = KeybindSet::new();
+//!     keybinds.bindall(vec![
+//!         // workspace keys
+//!         (&[MODKEY], "1", lazy! {wm, wm.goto_workspace(1)}),
+//!         (&[MODKEY], "2", lazy! {wm, wm.goto_workspace(2)}),
+//!         (&[MODKEY], "3", lazy! {wm, wm.goto_workspace(3)}),
+//!         // quit
+//!         (&[MODKEY], "q", lazy! {Lapin::quit()}),
+//!         // spawns
+//!         (&[MODKEY], "Return", lazy! {Lapin::spawn(TERMINAL)}),
+//!         (&[MODKEY], "n", lazy! {Lapin::spawn("chromium")}),
+//!         (&[MODKEY], "a", lazy! {Lapin::spawn("rofi -show run")}),
+//!         // kill focus
+//!         (&[MODKEY], "w", lazy! {wm, wm.killfocused()}),
+//!         // change focus
+//!         (&[MODKEY], "j", lazy! {wm, wm.nextwin()}),
+//!         (&[MODKEY], "k", lazy! {wm, wm.prevwin()}),
+//!         // change layout
+//!         (&[MODKEY], "space", lazy! {wm, wm.next_layout()}),
+//!         (&[MODKEY, "Shift"], "space", lazy! {wm, wm.prev_layout()}),
+//!
+//!         //
+//!         // You can check other useful functions to use as keybinds in the
+//!         // docs for the Lapin struct.
+//!         //
+//!     ]);
+//!
+//!     // You can create Layouts with different configs. To use default ones,
+//!     // use their "new()" functions. Custom layouts can be created just by
+//!     // implementing the Layout trait for them. The default config has
+//!     // the three default layouts with default config.
+//!     let tile = Tiling {
+//!         name: "tile",
+//!         borders: 4,
+//!         master_factor: 1.0 / 2.0,
+//!         gaps: 4,
+//!         gaps_on_single: false,
+//!     };
+//!     let max = Maximized::new();
+//!     let float = Floating {
+//!         name: "float",
+//!         borders: 4,
+//!     };
+//!
+//!     // Use the layouts! macro to create a list of layouts.
+//!     lapin.config.layouts = layouts![tile, max, float];
+//!
+//!     // You can autostart stuff easily using the Lapin::spawn.
+//!     Lapin::spawn("picom");
+//!
+//!     // The last thing to do is starting the window manager with the keybind
+//!     // set with Lapin::init(&mut KeybindSet).
+//!     lapin.init(&mut keybinds);
+//! }
+//! ```
+
 pub mod config;
 pub mod keys;
 pub mod lapin_api;
