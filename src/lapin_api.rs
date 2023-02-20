@@ -45,10 +45,8 @@ impl Lapin {
 
     /// Returns the id of the currently focused window.
     pub fn get_focused_window(&self) -> Option<x::Window> {
-        let s = self.current_scr;
-        let k = self.screens[s].current_wk;
-        if let Some(w) = self.screens[s].workspaces[k].focused {
-            Some(self.screens[s].workspaces[k].windows[w])
+        if let Some(w) = self.current_workspace().focused {
+            Some(self.current_workspace().windows[w])
         } else {
             None
         }
@@ -91,16 +89,14 @@ impl Lapin {
     /// Rotate the current workspace stack up.
     pub fn rotate_windows_up(&mut self) {
         if let Some(cur_w) = self.current_workspace().focused {
-            let s = self.current_scr;
-            let k = self.current_screen().current_wk;
-            self.screens[s].workspaces[k].windows.rotate_left(1);
+            self.current_workspace_mut().windows.rotate_left(1);
             self.current_layout().reload(
                 &mut self.workspace_windows(),
                 &self.x_connection,
                 self.current_screen().width,
                 self.current_screen().height,
             );
-            self.screens[s].workspaces[k].focused = if cur_w == 0 {
+            self.current_workspace_mut().focused = if cur_w == 0 {
                 Some(self.current_workspace().windows.len() - 1)
             } else {
                 Some(cur_w - 1)
@@ -111,16 +107,14 @@ impl Lapin {
     /// Rotate the current workspace stack down.
     pub fn rotate_windows_down(&mut self) {
         if let Some(cur_w) = self.current_workspace().focused {
-            let s = self.current_scr;
-            let k = self.current_screen().current_wk;
-            self.screens[s].workspaces[k].windows.rotate_right(1);
+            self.current_workspace_mut().windows.rotate_right(1);
             self.current_layout().reload(
                 &mut self.workspace_windows(),
                 &self.x_connection,
                 self.current_screen().width,
                 self.current_screen().height,
             );
-            self.screens[s].workspaces[k].focused =
+            self.current_workspace_mut().focused =
                 if cur_w == self.current_workspace().windows.len() - 1 {
                     Some(0)
                 } else {
@@ -136,9 +130,6 @@ impl Lapin {
                 return;
             }
 
-            let s = self.current_scr;
-            let k = self.current_screen().current_wk;
-
             let next_w = if cur_w == self.current_workspace().windows.len() - 1 {
                 1
             } else {
@@ -146,11 +137,10 @@ impl Lapin {
             };
 
             let tmp = self.current_workspace().windows[cur_w];
-            self.screens[s].workspaces[k].windows[cur_w] =
-                self.screens[s].workspaces[k].windows[next_w];
-            self.screens[s].workspaces[k].windows[next_w] = tmp;
+            self.current_workspace_mut().windows[cur_w] = self.current_workspace().windows[next_w];
+            self.current_workspace_mut().windows[next_w] = tmp;
 
-            self.screens[s].workspaces[k].focused = Some(next_w);
+            self.current_workspace_mut().focused = Some(next_w);
 
             self.current_layout().reload(
                 &mut self.workspace_windows(),
@@ -168,9 +158,6 @@ impl Lapin {
                 return;
             }
 
-            let s = self.current_scr;
-            let k = self.current_screen().current_wk;
-
             let prev_w = if cur_w == 1 {
                 self.current_workspace().windows.len() - 1
             } else {
@@ -178,11 +165,10 @@ impl Lapin {
             };
 
             let tmp = self.current_workspace().windows[cur_w];
-            self.screens[s].workspaces[k].windows[cur_w] =
-                self.screens[s].workspaces[k].windows[prev_w];
-            self.screens[s].workspaces[k].windows[prev_w] = tmp;
+            self.current_workspace_mut().windows[cur_w] = self.current_workspace().windows[prev_w];
+            self.current_workspace_mut().windows[prev_w] = tmp;
 
-            self.screens[s].workspaces[k].focused = Some(prev_w);
+            self.current_workspace_mut().focused = Some(prev_w);
 
             self.current_layout().reload(
                 &mut self.workspace_windows(),
@@ -201,16 +187,13 @@ impl Lapin {
         }
 
         if let Some(cur_w) = self.current_workspace().focused {
-            let s = self.current_scr;
-            let k = self.current_screen().current_wk;
-
             let other_w = if cur_w == 0 { 1 } else { 0 };
 
             let tmp = self.current_workspace().windows[cur_w];
-            self.screens[s].workspaces[k].windows[cur_w] =
-                self.screens[s].workspaces[k].windows[other_w];
-            self.screens[s].workspaces[k].windows[other_w] = tmp;
-            self.screens[s].workspaces[k].focused = Some(other_w);
+            self.current_workspace_mut().windows[cur_w] = self.current_workspace().windows[other_w];
+            self.current_workspace_mut().windows[other_w] = tmp;
+            self.current_workspace_mut().focused = Some(other_w);
+
             self.current_layout().reload(
                 &mut self.workspace_windows(),
                 &self.x_connection,
