@@ -46,7 +46,11 @@ impl Lapin {
     /// Returns the id of the currently focused window.
     pub fn get_focused_window(&self) -> Option<x::Window> {
         if let Some(w) = self.current_workspace().focused {
-            Some(self.current_workspace().windows[w])
+            if self.current_workspace().ool_focus {
+                Some(self.current_workspace().ool_windows[w])
+            } else {
+                Some(self.current_workspace().windows[w])
+            }
         } else {
             None
         }
@@ -88,6 +92,9 @@ impl Lapin {
 
     /// Rotate the current workspace stack up.
     pub fn rotate_windows_up(&mut self) {
+        if self.current_workspace().ool_focus {
+            return;
+        }
         if let Some(cur_w) = self.current_workspace().focused {
             self.current_workspace_mut().windows.rotate_left(1);
             self.current_layout().reload(
@@ -106,6 +113,9 @@ impl Lapin {
 
     /// Rotate the current workspace stack down.
     pub fn rotate_windows_down(&mut self) {
+        if self.current_workspace().ool_focus {
+            return;
+        }
         if let Some(cur_w) = self.current_workspace().focused {
             self.current_workspace_mut().windows.rotate_right(1);
             self.current_layout().reload(
@@ -125,6 +135,9 @@ impl Lapin {
 
     /// Swaps the current window with the next slave window.
     pub fn swap_with_next_slave(&mut self) {
+        if self.current_workspace().ool_focus {
+            return;
+        }
         if let Some(cur_w) = self.current_workspace().focused {
             if cur_w == 0 {
                 return;
@@ -153,6 +166,9 @@ impl Lapin {
 
     /// Swaps the current window with the previous slave window.
     pub fn swap_with_prev_slave(&mut self) {
+        if self.current_workspace().ool_focus {
+            return;
+        }
         if let Some(cur_w) = self.current_workspace().focused {
             if cur_w == 0 {
                 return;
@@ -182,6 +198,9 @@ impl Lapin {
     /// Changes current window with the master window, or changes the master
     /// window with the first slave window.
     pub fn change_master(&mut self) {
+        if self.current_workspace().ool_focus {
+            return;
+        }
         if self.current_workspace().windows.len() < 2 {
             return;
         }
@@ -200,6 +219,35 @@ impl Lapin {
                 self.current_screen().width,
                 self.current_screen().height,
             );
+        }
+    }
+
+    pub fn toggle_ool(&mut self) {
+        if let Some(w) = self.current_workspace().focused {
+            if self.current_workspace().ool_focus {
+                let window = self.current_workspace_mut().ool_windows.remove(w);
+                self.current_workspace_mut().windows.insert(0, window);
+                self.current_workspace_mut().ool_focus = false;
+                self.current_workspace_mut().focused = Some(0);
+                self.current_layout().newwin(
+                    &mut self.workspace_windows(),
+                    &self.x_connection,
+                    self.current_screen().width,
+                    self.current_screen().height,
+                );
+            } else {
+                let window = self.current_workspace_mut().windows.remove(w);
+                self.current_workspace_mut().ool_windows.insert(0, window);
+                self.current_workspace_mut().ool_focus = true;
+                self.current_workspace_mut().focused = Some(0);
+                self.current_layout().delwin(
+                    &mut self.workspace_windows(),
+                    self.current_workspace().focused,
+                    &self.x_connection,
+                    self.current_screen().width,
+                    self.current_screen().height,
+                );
+            }
         }
     }
 

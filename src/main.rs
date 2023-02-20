@@ -47,6 +47,8 @@ fn main() {
         ),
         // change master
         (&[MODKEY, "Shift"], "Return", lazy! {wm, wm.change_master()}),
+        // toggle ool
+        (&[MODKEY, "Shift"], "t", lazy! {wm, wm.toggle_ool()}),
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];

@@ -110,7 +110,9 @@ impl Screen {
 pub struct Workspace {
     pub name: &'static str,
     pub focused: Option<usize>,
+    pub ool_focus: bool,
     pub windows: Vec<x::Window>,
+    pub ool_windows: Vec<x::Window>,
     pub layout: usize,
 }
 impl Workspace {
@@ -121,7 +123,9 @@ impl Workspace {
         Workspace {
             name,
             focused: None,
+            ool_focus: false,
             windows: Vec::new(),
+            ool_windows: Vec::new(),
             layout: 0,
         }
     }

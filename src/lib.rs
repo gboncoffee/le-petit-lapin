@@ -166,12 +166,18 @@ impl fmt::Display for Lapin {
 }
 
 impl Lapin {
-    fn window_location(&self, win: x::Window) -> Option<(usize, usize, usize)> {
+    /// Returns the window location as (screen, workspace, index, is out of the layout?)
+    fn window_location(&self, win: x::Window) -> Option<(usize, usize, usize, bool)> {
         for (s, screen) in self.screens.iter().enumerate() {
             for (k, workspace) in screen.workspaces.iter().enumerate() {
                 for (w, window) in workspace.windows.iter().enumerate() {
                     if *window == win {
-                        return Some((s, k, w));
+                        return Some((s, k, w, false));
+                    }
+                }
+                for (w, window) in workspace.ool_windows.iter().enumerate() {
+                    if *window == win {
+                        return Some((s, k, w, true));
                     }
                 }
             }
@@ -295,14 +301,19 @@ impl Lapin {
             self.current_scr,
             self.current_screen().current_wk,
             0,
+            false,
         );
 
         self.x_connection.flush().ok();
     }
 
     fn unmanage_window(&mut self, window: x::Window) {
-        if let Some((s, k, w)) = self.window_location(window) {
-            self.current_workspace_mut().windows.remove(w);
+        if let Some((s, k, w, ool)) = self.window_location(window) {
+            if ool {
+                self.current_workspace_mut().ool_windows.remove(w);
+            } else {
+                self.current_workspace_mut().windows.remove(w);
+            }
             self.current_workspace_mut().focused = None;
             self.current_layout().delwin(
                 &mut self.workspace_windows(),
@@ -325,7 +336,15 @@ impl Lapin {
                     self.add_client_to_atom(*window);
                 }
             }
-            let n_wins = self.current_workspace().windows.len();
+            let ool_n = self.current_workspace().ool_windows.len();
+            let win_n = self.current_workspace().windows.len();
+            let (n_wins, ool) = if ool && ool_n > 0 {
+                (ool_n, true)
+            } else if win_n > 0 {
+                (win_n, false)
+            } else {
+                (0, false)
+            };
             if n_wins > 0 {
                 let win = if w != 0 {
                     if w >= n_wins {
@@ -336,16 +355,21 @@ impl Lapin {
                 } else {
                     0
                 };
-                self.set_focus(self.current_workspace().windows[win], s, k, win);
+                if ool {
+                    self.set_focus(self.current_workspace().ool_windows[win], s, k, win, true);
+                } else {
+                    self.set_focus(self.current_workspace().windows[win], s, k, win, false);
+                }
                 self.x_connection.flush().ok();
             }
         }
     }
 
-    fn set_focus(&mut self, window: x::Window, s: usize, k: usize, w: usize) {
+    fn set_focus(&mut self, window: x::Window, s: usize, k: usize, w: usize, ool: bool) {
         self.current_scr = s;
-        self.screens[s].current_wk = k;
-        self.screens[s].workspaces[k].focused = Some(w);
+        self.current_screen_mut().current_wk = k;
+        self.current_workspace_mut().focused = Some(w);
+        self.current_workspace_mut().ool_focus = ool;
         self.x_connection.send_request(&x::SetInputFocus {
             revert_to: x::InputFocus::PointerRoot,
             focus: window,
@@ -360,8 +384,8 @@ impl Lapin {
     }
 
     fn toggle_focus(&mut self, window: x::Window) {
-        if let Some((s, k, w)) = self.window_location(window) {
-            self.set_focus(window, s, k, w);
+        if let Some((s, k, w, ool)) = self.window_location(window) {
+            self.set_focus(window, s, k, w, ool);
         }
     }
 
@@ -428,38 +452,55 @@ impl Lapin {
     fn change_win(&mut self, previous: bool) {
         let s = self.current_scr;
         let k = self.current_screen().current_wk;
-        let n_wins = self.current_workspace().windows.len();
-        if n_wins > 1 {
-            if let Some(win) = self.get_focused_window() {
-                self.restore_border(win);
+        let ool = self.current_workspace().ool_focus;
+
+        if let Some(w) = self.current_workspace().focused {
+            let ool_n = self.current_workspace().ool_windows.len();
+            let win_n = self.current_workspace().windows.len();
+            if win_n + ool_n <= 1 {
+                return;
             }
-            self.current_workspace_mut().focused =
-                if let Some(cwin) = self.current_workspace().focused {
-                    let new_n = if previous && cwin > 0 {
-                        cwin - 1
-                    } else if previous {
-                        n_wins - 1
-                    } else {
-                        cwin + 1
-                    };
-                    if new_n >= n_wins {
-                        Some(0)
-                    } else {
-                        Some(new_n)
-                    }
+
+            let w = w as i32;
+            let (this, other) = if ool { (ool_n, win_n) } else { (win_n, ool_n) };
+            let new_w = if previous { w - 1 } else { w + 1 };
+            let (new_w, ool) = if new_w < 0 {
+                if other > 0 {
+                    ((other - 1), !ool)
                 } else {
-                    Some(0)
-                };
-            let w_n = self.current_workspace_mut().focused.unwrap();
-            let window = self.current_workspace_mut().windows[w_n];
-            self.set_focus(window, s, k, w_n);
-            self.current_layout().changewin(
-                &mut self.workspace_windows(),
-                w_n,
-                &self.x_connection,
-                previous,
-                self.current_screen().width,
-                self.current_screen().height,
+                    (this - 1, ool)
+                }
+            } else if new_w >= this as i32 {
+                if other > 0 {
+                    (0, !ool)
+                } else {
+                    (0, ool)
+                }
+            } else {
+                (new_w as usize, ool)
+            };
+            let window = if ool {
+                self.current_workspace().ool_windows[new_w]
+            } else {
+                self.current_workspace().windows[new_w]
+            };
+            self.restore_border(self.get_focused_window().unwrap());
+            self.set_focus(window, s, k, new_w, ool);
+            self.x_connection.flush().ok();
+            if !ool {
+                self.current_layout().changewin(
+                    &mut self.workspace_windows(),
+                    new_w,
+                    &self.x_connection,
+                    previous,
+                    self.current_screen().width,
+                    self.current_screen().height,
+                );
+            }
+            println!(
+                "ool: {} - {:?}",
+                self.current_workspace().ool_focus,
+                self.current_workspace().focused
             );
         }
     }
@@ -541,17 +582,13 @@ impl Lapin {
                     }
                 }
                 x::Event::ButtonPress(ev) => {
-                    if self.current_layout().allow_motions() {
+                    if self.current_layout().allow_motions() || self.current_workspace().ool_focus {
                         (diff_x, diff_y, pos_x, pos_y, move_window) = self.init_mouse_action(&ev)
                     }
                 }
-                x::Event::ButtonRelease(_) => {
-                    if self.current_layout().allow_motions() {
-                        (diff_x, diff_y) = (None, None)
-                    }
-                }
+                x::Event::ButtonRelease(_) => (diff_x, diff_y) = (None, None),
                 x::Event::MotionNotify(ev) => {
-                    if self.current_layout().allow_motions() {
+                    if self.current_layout().allow_motions() || self.current_workspace().ool_focus {
                         if let Some(x_d) = diff_x {
                             let y_d = diff_y.unwrap();
                             let x_p = pos_x.unwrap();
