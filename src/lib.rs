@@ -494,11 +494,6 @@ impl Lapin {
                     self.current_screen().height,
                 );
             }
-            println!(
-                "ool: {} - {:?}",
-                self.current_workspace().ool_focus,
-                self.current_workspace().focused
-            );
         }
     }
 
