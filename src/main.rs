@@ -49,6 +49,9 @@ fn main() {
         (&[MODKEY, "Shift"], "Return", lazy! {wm, wm.change_master()}),
         // toggle ool
         (&[MODKEY, "Shift"], "t", lazy! {wm, wm.toggle_ool()}),
+        // change focused screen (monitor)
+        (&[MODKEY], "y", lazy! {wm, wm.prev_screen()}),
+        (&[MODKEY], "u", lazy! {wm, wm.next_screen()}),
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];
@@ -58,7 +61,6 @@ fn main() {
         borders: 4,
         master_factor: 1.0 / 2.0,
         gaps: 4,
-        gaps_on_single: false,
     };
     let max = Maximized {
         name: "max",

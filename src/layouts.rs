@@ -11,28 +11,47 @@ use xcb::Connection;
 /// they should stick to just changing windows size and position.
 pub trait Layout {
     /// Called when a window is mapped, except when changing workspaces.
-    fn newwin(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32);
+    fn newwin(
+        &self,
+        windows: &mut Iter<x::Window>,
+        con: &Connection,
+        width: u16,
+        height: u16,
+        x: i16,
+        y: i16,
+    );
     /// Called when a window is unmaped, except when changing workspaces.
     fn delwin(
         &self,
         windows: &mut Iter<x::Window>,
         current: Option<usize>,
         con: &Connection,
-        width: u32,
-        height: u32,
+        width: u16,
+        height: u16,
+        x: i16,
+        y: i16,
     );
     /// Called any time some action requires a full reload of the windows size
     /// and/or position, such as changing workspaces or layouts.
-    fn reload(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32);
+    fn reload(
+        &self,
+        windows: &mut Iter<x::Window>,
+        con: &Connection,
+        width: u16,
+        height: u16,
+        x: i16,
+        y: i16,
+    );
     /// Called when the focus was changed.
     fn changewin(
         &self,
         windows: &mut Iter<x::Window>,
         number: usize,
         con: &Connection,
-        previous: bool,
-        width: u32,
-        height: u32,
+        width: u16,
+        height: u16,
+        x: i16,
+        y: i16,
     );
     /// The window manager calls this function when a mouse motion is
     /// performed to check if it should allow it to move and/or resize windows.
@@ -41,7 +60,7 @@ pub trait Layout {
     fn allow_motions(&self) -> bool;
     /// The window manager calls this function to get the border size it should
     /// set to windows. Layouts should return 0 to no border.
-    fn border_width(&self) -> u32;
+    fn border_width(&self) -> u16;
 
     /// Returns the layout name. It's recommended to leave the name as a free
     /// choice of the user.
@@ -51,7 +70,7 @@ pub trait Layout {
 /// A floating layout. Does nothing with the windows and allows motions.
 /// Supports optional borders.
 pub struct Floating {
-    pub borders: u32,
+    pub borders: u16,
     pub name: &'static str,
 }
 
@@ -68,33 +87,52 @@ impl Floating {
 }
 
 impl Layout for Floating {
-    fn newwin(&self, _windows: &mut Iter<x::Window>, _con: &Connection, _width: u32, _height: u32) {
+    fn newwin(
+        &self,
+        _windows: &mut Iter<x::Window>,
+        _con: &Connection,
+        _width: u16,
+        _height: u16,
+        _x: i16,
+        _y: i16,
+    ) {
     }
     fn delwin(
         &self,
         _windows: &mut Iter<x::Window>,
         _current: Option<usize>,
         _con: &Connection,
-        _width: u32,
-        _height: u32,
+        _width: u16,
+        _height: u16,
+        _x: i16,
+        _y: i16,
     ) {
     }
-    fn reload(&self, _windows: &mut Iter<x::Window>, _con: &Connection, _width: u32, _height: u32) {
+    fn reload(
+        &self,
+        _windows: &mut Iter<x::Window>,
+        _con: &Connection,
+        _width: u16,
+        _height: u16,
+        _x: i16,
+        _y: i16,
+    ) {
     }
     fn changewin(
         &self,
         _windows: &mut Iter<x::Window>,
         _number: usize,
         _con: &Connection,
-        _previous: bool,
-        _width: u32,
-        _height: u32,
+        _width: u16,
+        _height: u16,
+        _x: i16,
+        _y: i16,
     ) {
     }
     fn allow_motions(&self) -> bool {
         true
     }
-    fn border_width(&self) -> u32 {
+    fn border_width(&self) -> u16 {
         self.borders
     }
     fn name(&self) -> &'static str {
@@ -105,14 +143,11 @@ impl Layout for Floating {
 /// A tiling layout, similar to DWM. Supports optional gaps and borders.
 pub struct Tiling {
     pub name: &'static str,
-    pub borders: u32,
+    pub borders: u16,
     /// Ratio of the screen used by the master window. Ranges from 0 to 1.
     pub master_factor: f32,
     /// Gaps around and between the windows.
-    pub gaps: u32,
-    /// If gaps and borders should be drawn when there's only one window in the
-    /// stack.
-    pub gaps_on_single: bool,
+    pub gaps: u16,
 }
 
 impl Tiling {
@@ -120,7 +155,6 @@ impl Tiling {
     /// - 4 pixels for borders;
     /// - 1/2 (0.5) of master factor;
     /// - 4 pixels for gaps;
-    /// - Gaps on single set to true;
     /// - "Tiling" as the name.
     pub fn new() -> Tiling {
         Tiling {
@@ -128,7 +162,6 @@ impl Tiling {
             borders: 4,
             master_factor: 1.0 / 2.0,
             gaps: 4,
-            gaps_on_single: true,
         }
     }
 }
@@ -140,29 +173,32 @@ impl Layout for Tiling {
     fn allow_motions(&self) -> bool {
         false
     }
-    fn border_width(&self) -> u32 {
+    fn border_width(&self) -> u16 {
         self.borders
     }
 
-    fn reload(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32) {
+    fn reload(
+        &self,
+        windows: &mut Iter<x::Window>,
+        con: &Connection,
+        width: u16,
+        height: u16,
+        x: i16,
+        y: i16,
+    ) {
         let n_wins = windows.len();
         if n_wins == 0 {
             return;
         } else if n_wins == 1 {
-            let (pos, w, h) = if self.gaps_on_single {
-                (
-                    self.gaps as i32,
-                    width - (self.gaps * 2) - (self.borders * 2),
-                    height - (self.gaps * 2) - (self.borders * 2),
-                )
-            } else {
-                (-(self.borders as i32), width, height)
-            };
             let list = [
-                x::ConfigWindow::X(pos),
-                x::ConfigWindow::Y(pos),
-                x::ConfigWindow::Width(w),
-                x::ConfigWindow::Height(h),
+                x::ConfigWindow::X((x + (self.gaps as i16)) as i32),
+                x::ConfigWindow::Y((y + (self.gaps as i16)) as i32),
+                x::ConfigWindow::Width(
+                    (width - ((self.gaps * 2) as u16) - ((self.borders * 2) as u16)) as u32,
+                ),
+                x::ConfigWindow::Height(
+                    (height - ((self.gaps * 2) as u16) - ((self.borders * 2) as u16)) as u32,
+                ),
             ];
             con.send_request(&x::ConfigureWindow {
                 window: *windows.next().unwrap(),
@@ -170,29 +206,30 @@ impl Layout for Tiling {
             });
         } else {
             let list = [
-                x::ConfigWindow::X(self.gaps as i32),
-                x::ConfigWindow::Y(self.gaps as i32),
+                x::ConfigWindow::X((x + (self.gaps as i16)) as i32),
+                x::ConfigWindow::Y((y + (self.gaps as i16)) as i32),
                 x::ConfigWindow::Width(
-                    (((width as f32) * self.master_factor) as u32)
-                        - (((self.gaps as f32) * 1.5) as u32)
-                        - (self.borders * 2),
+                    ((((width as f32) * self.master_factor) as u16)
+                        - (((self.gaps as f32) * 1.5) as u16)
+                        - (self.borders * 2)) as u32,
                 ),
-                x::ConfigWindow::Height(height - (self.gaps * 2) - (self.borders * 2)),
+                x::ConfigWindow::Height((height - (self.gaps * 2) - (self.borders * 2)) as u32),
             ];
             con.send_request(&x::ConfigureWindow {
                 window: *windows.next().unwrap(),
                 value_list: &list,
             });
             let n_slave_wins = n_wins - 1;
-            let x = (((width as f32) * self.master_factor) as u32) + (self.gaps / 2);
-            let width = (width / 2) - (((self.gaps as f32) * 1.5) as u32) - (self.borders * 2);
+            let x = x + (((((width as f32) * self.master_factor) as u16) + (self.gaps / 2)) as i16);
+            let width = (width / 2) - (((self.gaps as f32) * 1.5) as u16) - (self.borders * 2);
             let height = (height
-                - (self.gaps * (n_slave_wins + 1) as u32)
-                - (self.borders * 2 * (n_slave_wins as u32)))
-                / (n_slave_wins as u32);
+                - (self.gaps * (n_slave_wins + 1) as u16)
+                - (self.borders * 2 * (n_slave_wins as u16)))
+                / (n_slave_wins as u16);
             for (n, window) in windows.enumerate() {
-                let y = (height * (n as u32) + (self.borders * 2 * (n as u32)))
-                    + (self.gaps * ((n + 1) as u32));
+                let y = y
+                    + (((height * (n as u16) + (self.borders * 2 * (n as u16)))
+                        + (self.gaps * ((n + 1) as u16))) as i16);
                 let list = [
                     x::ConfigWindow::X(x as i32),
                     x::ConfigWindow::Y(y as i32),
@@ -208,27 +245,38 @@ impl Layout for Tiling {
         con.flush().ok();
     }
 
-    fn newwin(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32) {
-        self.reload(windows, con, width, height);
+    fn newwin(
+        &self,
+        windows: &mut Iter<x::Window>,
+        con: &Connection,
+        width: u16,
+        height: u16,
+        x: i16,
+        y: i16,
+    ) {
+        self.reload(windows, con, width, height, x, y);
     }
     fn delwin(
         &self,
         windows: &mut Iter<x::Window>,
         _current: Option<usize>,
         con: &Connection,
-        width: u32,
-        height: u32,
+        width: u16,
+        height: u16,
+        x: i16,
+        y: i16,
     ) {
-        self.reload(windows, con, width, height);
+        self.reload(windows, con, width, height, x, y);
     }
     fn changewin(
         &self,
         _windows: &mut Iter<x::Window>,
         _number: usize,
         _con: &Connection,
-        _previous: bool,
-        _width: u32,
-        _height: u32,
+        _width: u16,
+        _height: u16,
+        _x: i16,
+        _y: i16,
     ) {
     }
 }
@@ -237,8 +285,8 @@ impl Layout for Tiling {
 /// Supports optional gaps and borders. Use 0 to disable then.
 pub struct Maximized {
     pub name: &'static str,
-    pub borders: u32,
-    pub gaps: u32,
+    pub borders: u16,
+    pub gaps: u16,
 }
 
 impl Maximized {
@@ -263,29 +311,45 @@ impl Layout for Maximized {
         false
     }
 
-    fn border_width(&self) -> u32 {
+    fn border_width(&self) -> u16 {
         self.borders
     }
 
-    fn newwin(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32) {
+    fn newwin(
+        &self,
+        windows: &mut Iter<x::Window>,
+        con: &Connection,
+        width: u16,
+        height: u16,
+        x: i16,
+        y: i16,
+    ) {
         let window = *windows.next().unwrap();
         let list = [
-            x::ConfigWindow::X((self.gaps) as i32),
-            x::ConfigWindow::Y((self.gaps) as i32),
-            x::ConfigWindow::Width(width - (self.gaps * 4) - (self.borders * 2)),
-            x::ConfigWindow::Height(height - (self.gaps * 4) - (self.borders * 2)),
+            x::ConfigWindow::X((x + (self.gaps as i16)) as i32),
+            x::ConfigWindow::Y((y + (self.gaps as i16)) as i32),
+            x::ConfigWindow::Width((width - (self.gaps * 2) - (self.borders * 2)) as u32),
+            x::ConfigWindow::Height((height - (self.gaps * 2) - (self.borders * 2)) as u32),
         ];
         con.send_request(&x::ConfigureWindow {
             window,
             value_list: &list,
         });
     }
-    fn reload(&self, windows: &mut Iter<x::Window>, con: &Connection, width: u32, height: u32) {
+    fn reload(
+        &self,
+        windows: &mut Iter<x::Window>,
+        con: &Connection,
+        width: u16,
+        height: u16,
+        x: i16,
+        y: i16,
+    ) {
         let list = [
-            x::ConfigWindow::X((self.gaps + self.borders) as i32),
-            x::ConfigWindow::Y((self.gaps + self.borders) as i32),
-            x::ConfigWindow::Width(width - (self.gaps * 4) - (self.borders * 2)),
-            x::ConfigWindow::Height(height - (self.gaps * 4) - (self.borders * 2)),
+            x::ConfigWindow::X((x + (self.gaps as i16)) as i32),
+            x::ConfigWindow::Y((y + (self.gaps as i16)) as i32),
+            x::ConfigWindow::Width((width - (self.gaps * 2) - (self.borders * 2)) as u32),
+            x::ConfigWindow::Height((height - (self.gaps * 2) - (self.borders * 2)) as u32),
         ];
         for window in windows {
             con.send_request(&x::ConfigureWindow {
@@ -293,15 +357,16 @@ impl Layout for Maximized {
                 value_list: &list,
             });
         }
-        con.flush().ok();
     }
     fn delwin(
         &self,
         _windows: &mut Iter<x::Window>,
         _current: Option<usize>,
         _con: &Connection,
-        _width: u32,
-        _height: u32,
+        _width: u16,
+        _height: u16,
+        _x: i16,
+        _y: i16,
     ) {
     }
     fn changewin(
@@ -309,9 +374,10 @@ impl Layout for Maximized {
         _windows: &mut Iter<x::Window>,
         _number: usize,
         _con: &Connection,
-        _previous: bool,
-        _width: u32,
-        _height: u32,
+        _width: u16,
+        _height: u16,
+        _x: i16,
+        _y: i16,
     ) {
     }
 }
@@ -329,7 +395,6 @@ impl Layout for Maximized {
 ///     borders: 4,
 ///     master_factor: 1.0 / 2.0,
 ///     gaps: 4,
-///     gaps_on_single: false,
 /// };
 /// let max = Maximized {
 ///     name: "max",

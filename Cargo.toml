@@ -7,5 +7,5 @@ links = "x11"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-xcb = {version = "1.2.0", features = ["xkb"]}
+xcb = {version = "1.2.0", features = ["xkb", "xinerama"]}
 x11 = "2.21.0"

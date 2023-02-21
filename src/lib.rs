@@ -137,13 +137,34 @@ use xcb::x;
 use xcb::Connection;
 use xcb::Xid;
 
+xcb::atoms_struct! {
+    #[derive(Copy, Clone, Debug)]
+    /// Atoms struct for the window manager.
+    pub struct Atoms {
+        pub wm_protocols => b"WM_PROTOCOLS" only_if_exists = false,
+        pub wm_del_window => b"WM_DELETE_WINDOW" only_if_exists = false,
+        pub wm_state => b"WM_STATE" only_if_exists = false,
+        pub wm_take_focus => b"WM_TAKE_FOCUS" only_if_exists = false,
+        pub net_active_window => b"_NET_ACTIVE_WINDOW" only_if_exists = false,
+        pub net_supported => b"_NET_SUPPORTED" only_if_exists = false,
+        pub net_wm_name => b"_NET_WM_NAME" only_if_exists = false,
+        pub net_wm_state => b"_NET_WM_STATE" only_if_exists = false,
+        pub net_wm_fullscreen => b"_NET_WM_STATE_FULLSCREEN" only_if_exists = false,
+        pub net_wm_window_type => b"_NET_WM_WINDOW_TYPE" only_if_exists = false,
+        pub net_wm_window_type_dialog => b"_NET_WM_WINDOW_TYPE_DIALOG" only_if_exists = false,
+        pub net_client_list => b"_NET_CLIENT_LIST" only_if_exists = false,
+    }
+}
+
 /// The window manager I suppose.
 pub struct Lapin {
     pub x_connection: Connection,
     pub config: Config,
     pub keybinds: KeybindSet,
     pub screens: Vec<Screen>,
+    pub atoms: Atoms,
     current_scr: usize,
+    root: x::Window,
 }
 
 impl fmt::Display for Lapin {
@@ -189,7 +210,7 @@ impl Lapin {
         self.x_connection.send_request(&x::ConfigureWindow {
             window: w,
             value_list: &[x::ConfigWindow::BorderWidth(
-                self.current_layout().border_width(),
+                self.current_layout().border_width() as u32,
             )],
         });
     }
@@ -211,9 +232,9 @@ impl Lapin {
     fn add_client_to_atom(&self, window: x::Window) {
         self.x_connection.send_request(&x::ChangeProperty {
             mode: x::PropMode::Append,
-            window: self.current_screen().root,
-            property: self.current_screen().atoms.net_client_list,
-            r#type: self.current_screen().atoms.net_client_list,
+            window: self.root,
+            property: self.atoms.net_client_list,
+            r#type: self.atoms.net_client_list,
             data: &window.resource_id().to_ne_bytes(),
         });
     }
@@ -238,7 +259,7 @@ impl Lapin {
         } else {
             self.x_connection.send_request(&x::SetInputFocus {
                 revert_to: x::InputFocus::PointerRoot,
-                focus: self.current_screen().root,
+                focus: self.root,
                 time: x::CURRENT_TIME,
             });
         }
@@ -286,6 +307,8 @@ impl Lapin {
             &self.x_connection,
             self.current_screen().width,
             self.current_screen().height,
+            self.current_screen().x,
+            self.current_screen().y,
         );
 
         self.x_connection.send_request(&x::MapWindow {
@@ -321,19 +344,25 @@ impl Lapin {
                 &self.x_connection,
                 self.current_screen().width,
                 self.current_screen().height,
+                self.current_screen().x,
+                self.current_screen().y,
             );
             self.x_connection.send_request(&x::ChangeProperty::<u8> {
                 mode: x::PropMode::Replace,
-                window: self.current_screen().root,
-                property: self.current_screen().atoms.net_client_list,
-                r#type: self.current_screen().atoms.net_client_list,
+                window: self.root,
+                property: self.atoms.net_client_list,
+                r#type: self.atoms.net_client_list,
                 data: &[],
             });
             self.x_connection.flush().ok();
-            let iter = self.current_screen().workspaces.iter();
-            for wk in iter {
-                for window in wk.windows.iter() {
-                    self.add_client_to_atom(*window);
+            for scr in &self.screens {
+                for wk in &scr.workspaces {
+                    for window in &wk.windows {
+                        self.add_client_to_atom(*window);
+                    }
+                    for window in &wk.ool_windows {
+                        self.add_client_to_atom(*window);
+                    }
                 }
             }
             // set focus (or return if there's no window to set focus to)
@@ -489,9 +518,10 @@ impl Lapin {
                     &mut self.workspace_windows(),
                     new_w,
                     &self.x_connection,
-                    previous,
                     self.current_screen().width,
                     self.current_screen().height,
+                    self.current_screen().x,
+                    self.current_screen().y,
                 );
             }
         }
@@ -533,7 +563,45 @@ impl Lapin {
             &self.x_connection,
             self.current_screen().width,
             self.current_screen().height,
+            self.current_screen().x,
+            self.current_screen().y,
         );
+        self.x_connection.flush().ok();
+    }
+
+    fn change_screen(&mut self, previous: bool) {
+        if let Some(old_win) = self.get_focused_window() {
+            self.restore_border(old_win);
+        }
+        let new_s = if previous {
+            (self.current_scr as isize) - 1
+        } else {
+            (self.current_scr as isize) + 1
+        };
+        let new_s = if new_s < 0 {
+            (self.screens.len() - 1) as usize
+        } else if new_s >= self.screens.len() as isize {
+            0
+        } else {
+            new_s as usize
+        };
+
+        self.current_scr = new_s;
+        if let Some(window) = self.get_focused_window() {
+            self.color_focused_border(window);
+            if !self.current_workspace().ool_focus {
+                let n = self.current_workspace().focused.unwrap();
+                self.current_layout().changewin(
+                    &mut self.workspace_windows(),
+                    n,
+                    &self.x_connection,
+                    self.current_screen().width,
+                    self.current_screen().height,
+                    self.current_screen().x,
+                    self.current_screen().y,
+                )
+            }
+        }
         self.x_connection.flush().ok();
     }
 

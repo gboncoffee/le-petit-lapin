@@ -1,11 +1,12 @@
 //! This module defines a bunch of useful public functions to the `Lapin`
 //! struct. Check then on docs for `lapin::Lapin`.
 use crate::config::Config;
-use crate::keys::KeybindSet;
+use crate::keys::{match_mods, KeybindSet};
 use crate::screens::Screen;
-use crate::Lapin;
+use crate::{Atoms, Lapin};
 use std::process;
 use xcb::x;
+use xcb::xinerama;
 use xcb::Connection;
 
 impl Lapin {
@@ -17,26 +18,85 @@ impl Lapin {
         let config = Config::new();
         let screens = Vec::new();
         let keybinds = KeybindSet::new();
+        let root = x_connection
+            .get_setup()
+            .roots()
+            .next()
+            .expect("Failed to retrive root window!")
+            .root();
+        let atoms = Atoms::intern_all(&x_connection).expect("Cannot init atoms!");
+
         Lapin {
             x_connection,
             config,
             screens,
             current_scr: current_scr as usize,
             keybinds,
+            root,
+            atoms,
         }
     }
 
     /// The last function that should be called, because it'll start the main
     /// loop and bind keys, efectively never returning.
     pub fn init(&mut self, keybinds: &mut KeybindSet) {
-        for screen in self.x_connection.get_setup().roots() {
-            self.screens
-                .push(Screen::new(&self, screen.root(), keybinds));
+        // bind keys.
+        for ((modmask, _, code), _) in keybinds.iter() {
+            self.x_connection.send_request(&x::GrabKey {
+                owner_events: true,
+                grab_window: self.root,
+                modifiers: *modmask,
+                key: *code,
+                pointer_mode: x::GrabMode::Async,
+                keyboard_mode: x::GrabMode::Async,
+            });
+        }
+
+        // grab mouse
+        self.x_connection.send_request(&x::GrabButton {
+            owner_events: true,
+            grab_window: self.root,
+            event_mask: x::EventMask::BUTTON_MOTION
+                | x::EventMask::BUTTON_PRESS
+                | x::EventMask::BUTTON_RELEASE,
+            pointer_mode: x::GrabMode::Async,
+            keyboard_mode: x::GrabMode::Async,
+            confine_to: x::WINDOW_NONE,
+            cursor: x::CURSOR_NONE,
+            button: x::ButtonIndex::Any,
+            modifiers: match_mods(self.config.mouse_mod).0,
+        });
+
+        // register events
+        let event_mask = x::EventMask::SUBSTRUCTURE_NOTIFY
+            | x::EventMask::STRUCTURE_NOTIFY
+            | x::EventMask::SUBSTRUCTURE_REDIRECT
+            | x::EventMask::PROPERTY_CHANGE;
+
+        self.x_connection.send_request(&x::ChangeWindowAttributes {
+            window: self.root,
+            value_list: &[x::Cw::EventMask(event_mask)],
+        });
+
+        // setup monitors
+        let cookie = self.x_connection.send_request(&xinerama::QueryScreens {});
+        let reply = self
+            .x_connection
+            .wait_for_reply(cookie)
+            .expect("Failed to get monitors info");
+        for screen in reply.screen_info() {
+            self.screens.push(Screen::new(
+                &self,
+                screen.width,
+                screen.height,
+                screen.x_org,
+                screen.y_org,
+            ));
         }
 
         self.x_connection.send_request(&x::SetInputFocus {
             revert_to: x::InputFocus::PointerRoot,
-            focus: self.current_screen().root,
+            focus: self.root,
             time: x::CURRENT_TIME,
         });
 
@@ -102,6 +162,8 @@ impl Lapin {
                 &self.x_connection,
                 self.current_screen().width,
                 self.current_screen().height,
+                self.current_screen().x,
+                self.current_screen().y,
             );
             self.current_workspace_mut().focused = if cur_w == 0 {
                 Some(self.current_workspace().windows.len() - 1)
@@ -123,6 +185,8 @@ impl Lapin {
                 &self.x_connection,
                 self.current_screen().width,
                 self.current_screen().height,
+                self.current_screen().x,
+                self.current_screen().y,
             );
             self.current_workspace_mut().focused =
                 if cur_w == self.current_workspace().windows.len() - 1 {
@@ -160,6 +224,8 @@ impl Lapin {
                 &self.x_connection,
                 self.current_screen().width,
                 self.current_screen().height,
+                self.current_screen().x,
+                self.current_screen().y,
             );
         }
     }
@@ -191,6 +257,8 @@ impl Lapin {
                 &self.x_connection,
                 self.current_screen().width,
                 self.current_screen().height,
+                self.current_screen().x,
+                self.current_screen().y,
             );
         }
     }
@@ -218,6 +286,8 @@ impl Lapin {
                 &self.x_connection,
                 self.current_screen().width,
                 self.current_screen().height,
+                self.current_screen().x,
+                self.current_screen().y,
             );
         }
     }
@@ -234,6 +304,8 @@ impl Lapin {
                     &self.x_connection,
                     self.current_screen().width,
                     self.current_screen().height,
+                    self.current_screen().x,
+                    self.current_screen().y,
                 );
             } else {
                 let window = self.current_workspace_mut().windows.remove(w);
@@ -246,9 +318,21 @@ impl Lapin {
                     &self.x_connection,
                     self.current_screen().width,
                     self.current_screen().height,
+                    self.current_screen().x,
+                    self.current_screen().y,
                 );
             }
         }
+    }
+
+    /// Changes the focus to the next monitor.
+    pub fn next_screen(&mut self) {
+        self.change_screen(false);
+    }
+
+    /// Changes the focus to the previous monitor.
+    pub fn prev_screen(&mut self) {
+        self.change_screen(true);
     }
 
     /// Runs a system command. Arguments must be separated by spaces.

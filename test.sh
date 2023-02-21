@@ -1,5 +1,5 @@
 #!/bin/sh
 
-Xephyr -br -ac -noreset -screen 1440x900 :1 &
+Xephyr +xinerama +extension RANDR -screen 800x600+0+0 -screen 800x600+800+0 -ac :1 &
 DISPLAY=:1 cargo run
 killall Xephyr
