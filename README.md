@@ -9,3 +9,10 @@ little bunny" in French, but I'm not 100% sure about that because I don't speak
 French.
 
 ### This software is usable but lacks lots of features. Soon I'll make a release ;)
+
+## TODO
+
+- Callback to move windows between screens and workspaces;
+- Fullscreen;
+- A bar;
+- EWMH.
