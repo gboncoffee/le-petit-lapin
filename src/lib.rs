@@ -336,32 +336,29 @@ impl Lapin {
                     self.add_client_to_atom(*window);
                 }
             }
-            let ool_n = self.current_workspace().ool_windows.len();
-            let win_n = self.current_workspace().windows.len();
-            let (n_wins, ool) = if ool && ool_n > 0 {
-                (ool_n, true)
-            } else if win_n > 0 {
-                (win_n, false)
+            // set focus (or return if there's no window to set focus to)
+            let ool = if ool && self.current_workspace().ool_windows.len() > 0 {
+                true
+            } else if self.current_workspace().windows.len() > 0 {
+                false
+            } else if self.current_workspace().ool_windows.len() > 0 {
+                true
             } else {
-                (0, false)
+                return;
             };
-            if n_wins > 0 {
-                let win = if w != 0 {
-                    if w >= n_wins {
-                        w - 1
-                    } else {
-                        w
-                    }
-                } else {
-                    0
-                };
-                if ool {
-                    self.set_focus(self.current_workspace().ool_windows[win], s, k, win, true);
-                } else {
-                    self.set_focus(self.current_workspace().windows[win], s, k, win, false);
-                }
-                self.x_connection.flush().ok();
-            }
+
+            let compare = if ool {
+                self.current_workspace().ool_windows.len()
+            } else {
+                self.current_workspace().windows.len()
+            };
+            let w = if w >= compare { compare - 1 } else { w };
+            let window = if ool {
+                self.current_workspace().ool_windows[w]
+            } else {
+                self.current_workspace().windows[w]
+            };
+            self.set_focus(window, s, k, w, ool);
         }
     }
 
