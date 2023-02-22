@@ -50,7 +50,7 @@
 //!     // Lapin. "mouse_mod", for example, is the modifier we use with the
 //!     // mouse buttons to move windows around (with button 1) and resize then
 //!     // (with button 2).
-//!     lapin.config.mouse_mod = MODKEY;
+//!     lapin.config.mouse_mod = &[MODKEY];
 //!     // The workspaces number and name are handled here too. By default,
 //!     // they're 9 workspaces named as numbers from 1 to 9. In this example,
 //!     // we'll use 3:
@@ -101,7 +101,6 @@
 //!         borders: 4,
 //!         master_factor: 1.0 / 2.0,
 //!         gaps: 4,
-//!         gaps_on_single: false,
 //!     };
 //!     let max = Maximized::new();
 //!     let float = Floating {
