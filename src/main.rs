@@ -11,15 +11,24 @@ fn main() {
     let mut keybinds = KeybindSet::new();
     keybinds.bindall(vec![
         // workspace keys
-        (&[MODKEY], "1", lazy! {wm, wm.goto_workspace(1)}),
-        (&[MODKEY], "2", lazy! {wm, wm.goto_workspace(2)}),
-        (&[MODKEY], "3", lazy! {wm, wm.goto_workspace(3)}),
-        (&[MODKEY], "4", lazy! {wm, wm.goto_workspace(4)}),
-        (&[MODKEY], "5", lazy! {wm, wm.goto_workspace(5)}),
-        (&[MODKEY], "6", lazy! {wm, wm.goto_workspace(6)}),
-        (&[MODKEY], "7", lazy! {wm, wm.goto_workspace(7)}),
-        (&[MODKEY], "8", lazy! {wm, wm.goto_workspace(8)}),
-        (&[MODKEY], "9", lazy! {wm, wm.goto_workspace(9)}),
+        (&[MODKEY], "1", lazy! {wm, wm.goto_workspace(0)}),
+        (&[MODKEY], "2", lazy! {wm, wm.goto_workspace(1)}),
+        (&[MODKEY], "3", lazy! {wm, wm.goto_workspace(2)}),
+        (&[MODKEY], "4", lazy! {wm, wm.goto_workspace(3)}),
+        (&[MODKEY], "5", lazy! {wm, wm.goto_workspace(4)}),
+        (&[MODKEY], "6", lazy! {wm, wm.goto_workspace(5)}),
+        (&[MODKEY], "7", lazy! {wm, wm.goto_workspace(6)}),
+        (&[MODKEY], "8", lazy! {wm, wm.goto_workspace(7)}),
+        (&[MODKEY], "9", lazy! {wm, wm.goto_workspace(8)}),
+        (&[MODKEY, "Shift"], "1", lazy! {wm, wm.send_window_to_workspace(0)}),
+        (&[MODKEY, "Shift"], "2", lazy! {wm, wm.send_window_to_workspace(1)}),
+        (&[MODKEY, "Shift"], "3", lazy! {wm, wm.send_window_to_workspace(2)}),
+        (&[MODKEY, "Shift"], "4", lazy! {wm, wm.send_window_to_workspace(3)}),
+        (&[MODKEY, "Shift"], "5", lazy! {wm, wm.send_window_to_workspace(4)}),
+        (&[MODKEY, "Shift"], "6", lazy! {wm, wm.send_window_to_workspace(5)}),
+        (&[MODKEY, "Shift"], "7", lazy! {wm, wm.send_window_to_workspace(6)}),
+        (&[MODKEY, "Shift"], "8", lazy! {wm, wm.send_window_to_workspace(7)}),
+        (&[MODKEY, "Shift"], "9", lazy! {wm, wm.send_window_to_workspace(8)}),
         // quit
         (&[MODKEY], "q", lazy! {Lapin::quit()}),
         // spawns

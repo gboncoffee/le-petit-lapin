@@ -145,9 +145,47 @@ impl Lapin {
 
     /// Change current workspace.
     pub fn goto_workspace(&mut self, wk: usize) {
-        if (wk - 1) < self.current_screen().workspaces.len() {
-            self.change_workspace(wk - 1);
+        for window in &self.current_workspace().windows {
+            self.x_connection
+                .send_request(&x::UnmapWindow { window: *window });
         }
+        for window in &self.current_workspace().ool_windows {
+            self.x_connection
+                .send_request(&x::UnmapWindow { window: *window });
+        }
+        self.x_connection.flush().ok();
+        self.current_screen_mut().current_wk = wk;
+        for window in &self.current_workspace().windows {
+            self.x_connection
+                .send_request(&x::MapWindow { window: *window });
+        }
+        for window in &self.current_workspace().ool_windows {
+            self.x_connection
+                .send_request(&x::MapWindow { window: *window });
+        }
+        self.x_connection.flush().ok();
+        if let Some(focus) = self.current_workspace().focused {
+            self.x_connection.send_request(&x::SetInputFocus {
+                revert_to: x::InputFocus::PointerRoot,
+                focus: self.current_workspace().windows[focus],
+                time: x::CURRENT_TIME,
+            });
+        } else {
+            self.x_connection.send_request(&x::SetInputFocus {
+                revert_to: x::InputFocus::PointerRoot,
+                focus: self.root,
+                time: x::CURRENT_TIME,
+            });
+        }
+        self.current_layout().reload(
+            &mut self.workspace_windows(),
+            &self.x_connection,
+            self.current_screen().width,
+            self.current_screen().height,
+            self.current_screen().x,
+            self.current_screen().y,
+        );
+        self.x_connection.flush().ok();
     }
 
     /// Rotate the current workspace stack up.
@@ -333,6 +371,54 @@ impl Lapin {
     /// Changes the focus to the previous monitor.
     pub fn prev_screen(&mut self) {
         self.change_screen(true);
+    }
+
+    /// Sends the focused window to other workspace.
+    pub fn send_window_to_workspace(&mut self, workspace: usize) {
+        if self.current_screen().current_wk == workspace {
+            return;
+        }
+
+        if let Some(w) = self.current_workspace().focused {
+            let (ool, window) = if self.current_workspace().ool_focus {
+                let window = self.current_workspace_mut().ool_windows.remove(w);
+                self.current_screen_mut().workspaces[workspace].ool_windows.insert(0, window);
+                self.current_screen_mut().workspaces[workspace].ool_focus = true;
+                (true, window)
+            } else {
+                let window = self.current_workspace_mut().windows.remove(w);
+                self.current_screen_mut().workspaces[workspace].windows.insert(0, window);
+                self.current_screen_mut().workspaces[workspace].ool_focus = false;
+                (false, window)
+            };
+            self.current_screen_mut().workspaces[workspace].focused = Some(0);
+
+            self.x_connection.send_request(&x::UnmapWindow {
+                window,
+            });
+            self.x_connection.flush().ok();
+
+            self.reset_focus_after_removing(
+                self.current_scr,
+                self.current_screen().current_wk,
+                self.current_workspace().focused.unwrap(),
+                ool,
+            );
+            self.x_connection.flush().ok();
+
+            if !ool {
+                self.current_layout().delwin(
+                    &mut self.workspace_windows(),
+                    self.current_workspace().focused,
+                    &self.x_connection,
+                    self.current_screen().width,
+                    self.current_screen().height,
+                    self.current_screen().x,
+                    self.current_screen().y,
+                );
+            }
+            self.x_connection.flush().ok();
+        }
     }
 
     /// Runs a system command. Arguments must be separated by spaces.

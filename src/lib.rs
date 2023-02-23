@@ -238,33 +238,6 @@ impl Lapin {
         });
     }
 
-    fn change_workspace(&mut self, wk: usize) {
-        for window in self.workspace_windows() {
-            self.x_connection
-                .send_request(&x::UnmapWindow { window: *window });
-        }
-        self.current_screen_mut().current_wk = wk;
-        for window in self.workspace_windows() {
-            self.x_connection
-                .send_request(&x::MapWindow { window: *window });
-        }
-        self.x_connection.flush().ok();
-        if let Some(focus) = self.current_workspace().focused {
-            self.x_connection.send_request(&x::SetInputFocus {
-                revert_to: x::InputFocus::PointerRoot,
-                focus: self.current_workspace().windows[focus],
-                time: x::CURRENT_TIME,
-            });
-        } else {
-            self.x_connection.send_request(&x::SetInputFocus {
-                revert_to: x::InputFocus::PointerRoot,
-                focus: self.root,
-                time: x::CURRENT_TIME,
-            });
-        }
-        self.x_connection.flush().ok();
-    }
-
     fn manage_window(&mut self, ev: x::MapRequestEvent) {
         if self.window_location(ev.window()).is_some() {
             return;
@@ -329,6 +302,31 @@ impl Lapin {
         self.x_connection.flush().ok();
     }
 
+    fn reset_focus_after_removing(&mut self, s: usize, k: usize, w: usize, ool: bool) {
+        let ool = if ool && self.current_workspace().ool_windows.len() > 0 {
+            true
+        } else if self.current_workspace().windows.len() > 0 {
+            false
+        } else if self.current_workspace().ool_windows.len() > 0 {
+            true
+        } else {
+            return;
+        };
+
+        let compare = if ool {
+            self.current_workspace().ool_windows.len()
+        } else {
+            self.current_workspace().windows.len()
+        };
+        let w = if w >= compare { compare - 1 } else { w };
+        let window = if ool {
+            self.current_workspace().ool_windows[w]
+        } else {
+            self.current_workspace().windows[w]
+        };
+        self.set_focus(window, s, k, w, ool);
+    }
+
     fn unmanage_window(&mut self, window: x::Window) {
         if let Some((s, k, w, ool)) = self.window_location(window) {
             if ool {
@@ -364,29 +362,17 @@ impl Lapin {
                     }
                 }
             }
-            // set focus (or return if there's no window to set focus to)
-            let ool = if ool && self.current_workspace().ool_windows.len() > 0 {
-                true
-            } else if self.current_workspace().windows.len() > 0 {
-                false
-            } else if self.current_workspace().ool_windows.len() > 0 {
-                true
-            } else {
-                return;
-            };
-
-            let compare = if ool {
-                self.current_workspace().ool_windows.len()
-            } else {
-                self.current_workspace().windows.len()
-            };
-            let w = if w >= compare { compare - 1 } else { w };
-            let window = if ool {
-                self.current_workspace().ool_windows[w]
-            } else {
-                self.current_workspace().windows[w]
-            };
-            self.set_focus(window, s, k, w, ool);
+            self.reset_focus_after_removing(s, k, w, ool);
+            self.current_layout().delwin(
+                &mut self.workspace_windows(),
+                self.current_workspace().focused,
+                &self.x_connection,
+                self.current_screen().width,
+                self.current_screen().height,
+                self.current_screen().x,
+                self.current_screen().y
+            );
+            self.x_connection.flush().ok();
         }
     }
 
