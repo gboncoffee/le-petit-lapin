@@ -310,6 +310,7 @@ impl Lapin {
         } else if self.current_workspace().ool_windows.len() > 0 {
             true
         } else {
+            self.current_workspace_mut().focused = None;
             return;
         };
 
@@ -572,22 +573,94 @@ impl Lapin {
         };
 
         self.current_scr = new_s;
-        if let Some(window) = self.get_focused_window() {
+        let window = if let Some(window) = self.get_focused_window() {
             self.color_focused_border(window);
-            if !self.current_workspace().ool_focus {
-                let n = self.current_workspace().focused.unwrap();
-                self.current_layout().changewin(
+            window
+        } else {
+            self.root
+        };
+
+        self.x_connection.send_request(&x::SetInputFocus {
+            revert_to: x::InputFocus::PointerRoot,
+            focus: window,
+            time: x::CURRENT_TIME,
+        });
+
+        self.x_connection.flush().ok();
+    }
+
+    fn change_window_screen(&mut self, previous: bool) {
+        if let Some(window) = self.get_focused_window() {
+
+            let other_screen = if previous {
+                (self.current_scr as isize) - 1
+            } else {
+                (self.current_scr as isize) + 1
+            };
+            let other_screen: usize = if other_screen < 0 {
+                self.screens.len() - 1
+            } else if other_screen >= (self.screens.len() as isize) {
+                0
+            } else {
+                other_screen as usize
+            };
+
+            let ool = self.current_workspace().ool_focus;
+            let s = self.current_scr;
+            let k = self.current_screen().current_wk;
+            let w = self.current_workspace().focused.unwrap();
+
+            if ool {
+                self.current_workspace_mut().ool_windows.remove(w);
+            } else {
+                self.current_workspace_mut().windows.remove(w);
+            }
+
+            self.reset_focus_after_removing(s, k, w, ool);
+            self.restore_border(window);
+
+            if !ool {
+                self.current_layout().delwin(
                     &mut self.workspace_windows(),
-                    n,
+                    self.current_workspace().focused,
                     &self.x_connection,
                     self.current_screen().width,
                     self.current_screen().height,
                     self.current_screen().x,
-                    self.current_screen().y,
-                )
+                    self.current_screen().y
+                );
             }
+            self.x_connection.flush().ok();
+
+            let other_k = self.screens[other_screen].current_wk;
+            self.screens[other_screen].workspaces[other_k].focused = Some(0);
+            if ool {
+                let list = [
+                    x::ConfigWindow::X(self.screens[other_screen].x as i32),
+                    x::ConfigWindow::Y(self.screens[other_screen].y as i32),
+                    x::ConfigWindow::StackMode(x::StackMode::Above),
+                ];
+                self.screens[other_screen].workspaces[other_k].ool_windows.insert(0, window);
+                self.x_connection.send_request(&x::ConfigureWindow {
+                    window,
+                    value_list: &list,
+                });
+                self.screens[other_screen].workspaces[other_k].ool_focus = true;
+            } else {
+                let other_layout = self.screens[other_screen].workspaces[other_k].layout;
+                self.screens[other_screen].workspaces[other_k].windows.insert(0, window);
+                self.config.layouts[other_layout].newwin(
+                    &mut self.screens[other_screen].workspaces[other_k].windows.iter(),
+                    &self.x_connection,
+                    self.screens[other_screen].width,
+                    self.screens[other_screen].height,
+                    self.screens[other_screen].x,
+                    self.screens[other_screen].y,
+                );
+                self.screens[other_screen].workspaces[other_k].ool_focus = false;
+            }
+            self.x_connection.flush().ok();
         }
-        self.x_connection.flush().ok();
     }
 
     /// The main event loop of the window manager.

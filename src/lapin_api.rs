@@ -421,6 +421,20 @@ impl Lapin {
         }
     }
 
+    /// Sends the focused window to the next screen (monitor).
+    pub fn send_window_to_next_screen(&mut self) {
+        if self.screens.len() >= 2 {
+            self.change_window_screen(false);
+        }
+    }
+
+    /// Sends the focused window to the previous screen (monitor).
+    pub fn send_window_to_prev_screen(&mut self) {
+        if self.screens.len() >= 2 {
+            self.change_window_screen(true);
+        }
+    }
+
     /// Runs a system command. Arguments must be separated by spaces.
     /// Note that it DOES NOT runs it inside a shell.
     pub fn spawn(s: &str) {

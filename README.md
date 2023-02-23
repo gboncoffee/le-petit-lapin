@@ -12,7 +12,6 @@ French.
 
 ## TODO
 
-- Callback to move windows between screens and workspaces;
 - Fullscreen;
 - A bar;
 - EWMH.

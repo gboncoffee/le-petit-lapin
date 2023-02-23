@@ -61,6 +61,9 @@ fn main() {
         // change focused screen (monitor)
         (&[MODKEY], "y", lazy! {wm, wm.prev_screen()}),
         (&[MODKEY], "u", lazy! {wm, wm.next_screen()}),
+        // change focused window screen
+        (&[MODKEY, "Shift"], "y", lazy! {wm, wm.send_window_to_prev_screen()}),
+        (&[MODKEY, "Shift"], "u", lazy! {wm, wm.send_window_to_next_screen()}),
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];
