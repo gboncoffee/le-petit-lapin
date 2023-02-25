@@ -328,23 +328,13 @@ impl Lapin {
         self.set_focus(window, s, k, w, ool);
     }
 
-    fn unmanage_window(&mut self, window: x::Window) {
+    fn unmanage_window(&mut self, window: x::Window, set_focus: bool) {
         if let Some((s, k, w, ool)) = self.window_location(window) {
             if ool {
                 self.current_workspace_mut().ool_windows.remove(w);
             } else {
                 self.current_workspace_mut().windows.remove(w);
             }
-            self.current_workspace_mut().focused = None;
-            self.current_layout().delwin(
-                &mut self.workspace_windows(),
-                self.current_workspace().focused,
-                &self.x_connection,
-                self.current_screen().width,
-                self.current_screen().height,
-                self.current_screen().x,
-                self.current_screen().y,
-            );
             self.x_connection.send_request(&x::ChangeProperty::<u8> {
                 mode: x::PropMode::Replace,
                 window: self.root,
@@ -363,16 +353,30 @@ impl Lapin {
                     }
                 }
             }
-            self.reset_focus_after_removing(s, k, w, ool);
-            self.current_layout().delwin(
-                &mut self.workspace_windows(),
-                self.current_workspace().focused,
-                &self.x_connection,
-                self.current_screen().width,
-                self.current_screen().height,
-                self.current_screen().x,
-                self.current_screen().y
-            );
+            if set_focus { self.reset_focus_after_removing(s, k, w, ool); }
+            if !ool {
+                self.current_layout().delwin(
+                    &mut self.workspace_windows(),
+                    self.current_workspace().focused,
+                    &self.x_connection,
+                    self.current_screen().width,
+                    self.current_screen().height,
+                    self.current_screen().x,
+                    self.current_screen().y,
+                );
+            } else if !self.current_workspace().ool_focus {
+                if let Some(number) = self.current_workspace().focused {
+                    self.current_layout().changewin(
+                        &mut self.workspace_windows(),
+                        number,
+                        &self.x_connection,
+                        self.current_screen().width,
+                        self.current_screen().height,
+                        self.current_screen().x,
+                        self.current_screen().y,
+                        );
+                }
+            }
             self.x_connection.flush().ok();
         }
     }
@@ -397,6 +401,9 @@ impl Lapin {
 
     fn toggle_focus(&mut self, window: x::Window) {
         if let Some((s, k, w, ool)) = self.window_location(window) {
+            if let Some(window) = self.get_focused_window() {
+                self.restore_border(window);
+            }
             self.set_focus(window, s, k, w, ool);
         }
     }
@@ -443,6 +450,7 @@ impl Lapin {
             let list = [
                 x::ConfigWindow::X((ev.root_x() - x_diff) as i32),
                 x::ConfigWindow::Y((ev.root_y() - y_diff) as i32),
+                x::ConfigWindow::BorderWidth(self.config.border_width as u32),
             ];
             self.x_connection.send_request(&x::ConfigureWindow {
                 window,
@@ -673,6 +681,9 @@ impl Lapin {
         let mut move_window = None;
         // gambiarra to solve the problem of input when mapping windows
         let mut last_map = time::SystemTime::now();
+        // gambiarra to solve the problem of the focus after destroying a window over another
+        // window
+        let mut last_mouse_change_focus = time::SystemTime::now();
 
         loop {
             match utils::get_x_event(&self.x_connection) {
@@ -682,15 +693,20 @@ impl Lapin {
                 }
                 x::Event::DestroyNotify(ev) => {
                     last_map = time::SystemTime::now();
-                    self.unmanage_window(ev.window());
+                    let set_focus = if time::SystemTime::now().duration_since(last_mouse_change_focus).unwrap()
+                        > time::Duration::from_millis(100)
+                    {
+                        true
+                    } else {
+                        false
+                    };
+                    self.unmanage_window(ev.window(), set_focus);
                 }
                 x::Event::EnterNotify(ev) => {
                     if time::SystemTime::now().duration_since(last_map).unwrap()
                         > time::Duration::from_millis(100)
                     {
-                        if let Some(old_win) = self.get_focused_window() {
-                            self.restore_border(old_win);
-                        }
+                        last_mouse_change_focus = time::SystemTime::now();
                         self.toggle_focus(ev.event());
                     }
                 }

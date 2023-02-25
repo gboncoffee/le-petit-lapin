@@ -12,6 +12,5 @@ French.
 
 ## TODO
 
-- Fullscreen;
 - A bar;
 - EWMH.

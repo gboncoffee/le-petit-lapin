@@ -58,6 +58,8 @@ fn main() {
         (&[MODKEY, "Shift"], "Return", lazy! {wm, wm.change_master()}),
         // toggle ool
         (&[MODKEY, "Shift"], "t", lazy! {wm, wm.toggle_ool()}),
+        // fullscreen
+        (&[MODKEY, "Shift"], "f", lazy! {wm, wm.fullscreen()}),
         // change focused screen (monitor)
         (&[MODKEY], "y", lazy! {wm, wm.prev_screen()}),
         (&[MODKEY], "u", lazy! {wm, wm.next_screen()}),
@@ -68,21 +70,9 @@ fn main() {
 
     lapin.config.mouse_mod = &[MODKEY];
 
-    let tile = Tiling {
-        name: "tile",
-        borders: 4,
-        master_factor: 1.0 / 2.0,
-        gaps: 4,
-    };
-    let max = Maximized {
-        name: "max",
-        borders: 4,
-        gaps: 4,
-    };
-    let float = Floating {
-        name: "float",
-        borders: 4,
-    };
+    let tile = Tiling::new();
+    let max = Maximized::new();
+    let float = Floating::new();
 
     lapin.config.layouts = layouts![tile, max, float];
 

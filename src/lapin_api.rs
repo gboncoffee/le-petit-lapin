@@ -345,6 +345,10 @@ impl Lapin {
                     self.current_screen().x,
                     self.current_screen().y,
                 );
+                self.x_connection.send_request(&x::ConfigureWindow {
+                    window,
+                    value_list: &[x::ConfigWindow::BorderWidth(self.current_layout().border_width() as u32)],
+                });
             } else {
                 let window = self.current_workspace_mut().windows.remove(w);
                 self.current_workspace_mut().ool_windows.insert(0, window);
@@ -359,7 +363,12 @@ impl Lapin {
                     self.current_screen().x,
                     self.current_screen().y,
                 );
+                self.x_connection.send_request(&x::ConfigureWindow {
+                    window,
+                    value_list: &[x::ConfigWindow::BorderWidth(self.config.border_width as u32)],
+                });
             }
+            self.x_connection.flush().ok();
         }
     }
 
@@ -432,6 +441,29 @@ impl Lapin {
     pub fn send_window_to_prev_screen(&mut self) {
         if self.screens.len() >= 2 {
             self.change_window_screen(true);
+        }
+    }
+
+    /// Fullscreens a window. Kind of a hack, just toggles ool, sets x and y to the monitor
+    /// location and removes the border.
+    pub fn fullscreen(&mut self) {
+        if let Some(window) = self.get_focused_window() {
+            if !self.current_workspace().ool_focus {
+                self.toggle_ool();
+            }
+            let list = [
+                x::ConfigWindow::X(self.current_screen().x as i32),
+                x::ConfigWindow::Y(self.current_screen().y as i32),
+                x::ConfigWindow::Width(self.current_screen().width as u32),
+                x::ConfigWindow::Height(self.current_screen().height as u32),
+                x::ConfigWindow::BorderWidth(0),
+                x::ConfigWindow::StackMode(x::StackMode::Above),
+            ];
+            self.x_connection.send_request(&x::ConfigureWindow {
+                window,
+                value_list: &list,
+            });
+            self.x_connection.flush().ok();
         }
     }
 

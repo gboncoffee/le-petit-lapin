@@ -13,6 +13,8 @@ pub struct Config {
     pub border_color: u32,
     /// Border color of focused windows in the form ARGB.
     pub border_color_focus: u32,
+    /// Border width of ool windows.
+    pub border_width: u32,
     /// Layouts to use.
     pub layouts: Vec<Box<dyn Layout>>,
 }
@@ -24,6 +26,7 @@ impl Config {
             mouse_mod: &["Super"],
             border_color: 0xff000000,
             border_color_focus: 0xffffffff,
+            border_width: 4,
             layouts: vec![
                 Box::new(Tiling::new()),
                 Box::new(Maximized::new()),
