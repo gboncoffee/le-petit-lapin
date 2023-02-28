@@ -1,5 +1,6 @@
 use lapin::keys::*;
 use lapin::layouts::*;
+use lapin::rules::*;
 use lapin::*;
 
 fn main() {
@@ -70,13 +71,23 @@ fn main() {
 
     lapin.config.mouse_mod = &[MODKEY];
 
+    lapin.config.border_color = 0xff282a36;
+    lapin.config.border_color_focus = 0xffff79c6;
+
     let tile = Tiling::new();
     let max = Maximized::new();
     let float = Floating::new();
 
     lapin.config.layouts = layouts![tile, max, float];
 
+    lapin.config.rules = vec![
+        rule!(class "gimp" => Apply::Float),
+        rule!(class "mpv" => Apply::Fullscreen),
+        rule!(class "qbittorrent" => Apply::Workspace(1)),
+    ];
+
     // Lapin::spawn("picom");
+    Lapin::spawn("feh --no-fehbg --bg-fill /home/gb/.config/wallpaper");
 
     lapin.init(&mut keybinds);
 }

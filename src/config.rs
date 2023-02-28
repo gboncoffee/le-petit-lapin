@@ -1,6 +1,7 @@
 //! General configuration of the window manager.
 
 use crate::layouts::*;
+use crate::rules::*;
 
 /// General configuration of the window manager.
 pub struct Config {
@@ -17,6 +18,8 @@ pub struct Config {
     pub border_width: u32,
     /// Layouts to use.
     pub layouts: Vec<Box<dyn Layout>>,
+    /// Rules to apply to windows on spawn.
+    pub rules: Vec<Rule>,
 }
 
 impl Config {
@@ -32,6 +35,7 @@ impl Config {
                 Box::new(Maximized::new()),
                 Box::new(Floating::new()),
             ],
+            rules: vec![],
         }
     }
 }

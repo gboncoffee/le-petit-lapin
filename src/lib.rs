@@ -126,18 +126,18 @@ pub mod lapin_api;
 pub mod layouts;
 pub mod screens;
 pub mod utils;
+pub mod rules;
 
 use config::*;
 use keys::*;
 use screens::*;
-use std::fmt;
+use rules::*;
 use std::time;
 use xcb::x;
 use xcb::Connection;
 use xcb::Xid;
 
 xcb::atoms_struct! {
-    #[derive(Copy, Clone, Debug)]
     /// Atoms struct for the window manager.
     pub struct Atoms {
         pub wm_protocols => b"WM_PROTOCOLS" only_if_exists = false,
@@ -164,25 +164,6 @@ pub struct Lapin {
     pub atoms: Atoms,
     current_scr: usize,
     root: x::Window,
-}
-
-impl fmt::Display for Lapin {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let total_screens = self.screens.len();
-        let cur_screen = self.current_scr;
-        let total_workspaces = self.current_screen().workspaces.len();
-        let cur_workspace = self.current_screen().current_wk;
-        let total_windows = self.current_workspace().windows.len();
-        // gambiarra
-        let cur_window =
-            if let Some(win) = self.screens[cur_screen].workspaces[cur_workspace].focused {
-                format!("{win}")
-            } else {
-                "N/A".to_string()
-            };
-
-        f.write_str(&format!("Screen: {cur_screen}/{total_screens}, Workspace: {cur_workspace}/{total_workspaces}, Window: {cur_window}/{total_windows}"))
-    }
 }
 
 impl Lapin {
@@ -238,11 +219,51 @@ impl Lapin {
         });
     }
 
+    /// Apply rules for a window, returns what must be done with it (add_border, ool, workspace).
+    fn apply_rules(&self, window: x::Window) -> (bool, bool, usize) {
+
+        let mut add_border = true;
+        let mut ool = false;
+        let mut workspace = self.current_screen().current_wk;
+
+        let (class1, class2) = if let Some(t) = self.get_class_and_title(window) {
+            t
+        } else {
+            return (add_border, ool, workspace);
+        };
+
+        for rule in self.config.rules.iter() {
+            if rule.property == Property::Class(class1.clone())
+                || rule.property == Property::Class(class2.clone()) {
+                match rule.apply {
+                    Apply::Workspace(n) => workspace = n,
+                    Apply::Float => ool = true,
+                    Apply::Fullscreen => {
+                        self.x_connection.send_request(&x::ConfigureWindow {
+                            window,
+                            value_list: &[
+                                x::ConfigWindow::X(self.current_screen().x as i32),
+                                x::ConfigWindow::Y(self.current_screen().y as i32),
+                                x::ConfigWindow::Width(self.current_screen().width as u32),
+                                x::ConfigWindow::Height(self.current_screen().height as u32),
+                            ],
+                        });
+                        self.x_connection.flush().ok();
+                        ool = true;
+                        add_border = false;
+                    }
+                }
+            }
+        }
+
+        return (add_border, ool, workspace);
+    }
+
     fn manage_window(&mut self, ev: x::MapRequestEvent) {
+        // check if we really need to manage the window
         if self.window_location(ev.window()).is_some() {
             return;
         }
-
         let cookie = self.x_connection.send_request(&x::GetWindowAttributes {
             window: ev.window(),
         });
@@ -255,6 +276,7 @@ impl Lapin {
             return;
         }
 
+        // add required attributes
         self.x_connection.send_request(&x::ChangeWindowAttributes {
             window: ev.window(),
             value_list: &[
@@ -267,37 +289,42 @@ impl Lapin {
             ],
         });
 
-        self.add_border(ev.window());
+        let (add_border, ool, workspace) = self.apply_rules(ev.window());
+
+        if add_border {
+            self.add_border(ev.window());
+        }
         if let Some(old_win) = self.get_focused_window() {
             self.restore_border(old_win);
         }
 
-        self.current_workspace_mut().windows.insert(0, ev.window());
+        if ool {
+            self.current_screen_mut().workspaces[workspace].ool_windows.insert(0, ev.window());
+        } else {
+            self.current_screen_mut().workspaces[workspace].windows.insert(0, ev.window());
+        }
 
-        self.current_layout().newwin(
-            &mut self.workspace_windows(),
-            &self.x_connection,
-            self.current_screen().width,
-            self.current_screen().height,
-            self.current_screen().x,
-            self.current_screen().y,
-        );
-
-        self.x_connection.send_request(&x::MapWindow {
-            window: ev.window(),
-        });
-
+        if workspace == self.current_screen().current_wk {
+            self.current_layout().newwin(
+                &mut self.workspace_windows(),
+                &self.x_connection,
+                self.current_screen().width,
+                self.current_screen().height,
+                self.current_screen().x,
+                self.current_screen().y,
+            );
+            self.x_connection.send_request(&x::MapWindow {
+                window: ev.window(),
+            });
+            self.set_focus(
+                ev.window(),
+                self.current_scr,
+                self.current_screen().current_wk,
+                0,
+                ool,
+            );
+        }
         self.add_client_to_atom(ev.window());
-
-        self.x_connection.flush().ok();
-
-        self.set_focus(
-            ev.window(),
-            self.current_scr,
-            self.current_screen().current_wk,
-            0,
-            false,
-        );
 
         self.x_connection.flush().ok();
     }
@@ -762,5 +789,65 @@ impl Lapin {
 
     fn workspace_windows<'a>(&'a self) -> std::slice::Iter<'a, x::Window> {
         self.current_workspace().windows.iter()
+    }
+
+    /*
+     * The following functions are the most terrible code you'll ever see in your fucking life.
+     * Their only goal is to actually get the fucking window title and classes. Unfortunatelly, it
+     * looks like xcb was designed to don't allow you to do that. Try getting them to work without
+     * all these stupid ugly workarounds and you'll see. Good luck.
+     *
+     * Also, it simply doesn't work with the title ;). Not my falt btw.
+     */
+
+    fn get_string_property(&self, window: x::Window, property: x::Atom, ) -> Option<String> {
+        let cookie = self.x_connection.send_request(&x::GetProperty {
+            delete: false,
+            window,
+            property,
+            r#type: x::ATOM_STRING,
+            long_offset: 0,
+            long_length: 0,
+        });
+        let reply = self.x_connection.wait_for_reply(cookie);
+        let reply = if reply.is_err() {
+            return None;
+        } else {
+            reply.unwrap()
+        };
+        let cookie = self.x_connection.send_request(&x::GetProperty {
+            delete: false,
+            window,
+            property,
+            r#type: x::ATOM_STRING,
+            long_offset: 0,
+            long_length: reply.bytes_after(),
+        });
+        let reply = self.x_connection.wait_for_reply(cookie);
+        let reply = if reply.is_err() {
+            return None;
+        } else {
+            reply.unwrap()
+        };
+        let mut replied_value = reply.value().to_vec();
+        replied_value.pop();
+        let prop = if let Ok(prop) = String::from_utf8(replied_value) {
+            prop
+        } else {
+            return None;
+        };
+        Some(prop)
+    }
+
+    fn get_class_and_title(&self, window: x::Window) -> Option<(String, String)> {
+
+        let (class1, class2) = if let Some(class) = self.get_string_property(window, x::ATOM_WM_CLASS) {
+            let mut classes = class.split('\0');
+            (classes.next().unwrap().to_string(), classes.next().unwrap().to_string())
+        } else {
+            return None;
+        };
+
+        Some((class1, class2))
     }
 }
