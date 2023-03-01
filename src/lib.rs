@@ -124,14 +124,14 @@ pub mod config;
 pub mod keys;
 pub mod lapin_api;
 pub mod layouts;
+pub mod rules;
 pub mod screens;
 pub mod utils;
-pub mod rules;
 
 use config::*;
 use keys::*;
-use screens::*;
 use rules::*;
+use screens::*;
 use std::time;
 use xcb::x;
 use xcb::Connection;
@@ -221,7 +221,6 @@ impl Lapin {
 
     /// Apply rules for a window, returns what must be done with it (add_border, ool, workspace).
     fn apply_rules(&self, window: x::Window) -> (bool, bool, usize) {
-
         let mut add_border = true;
         let mut ool = false;
         let mut workspace = self.current_screen().current_wk;
@@ -234,7 +233,8 @@ impl Lapin {
 
         for rule in self.config.rules.iter() {
             if rule.property == Property::Class(class1.clone())
-                || rule.property == Property::Class(class2.clone()) {
+                || rule.property == Property::Class(class2.clone())
+            {
                 match rule.apply {
                     Apply::Workspace(n) => workspace = n,
                     Apply::Float => ool = true,
@@ -299,9 +299,13 @@ impl Lapin {
         }
 
         if ool {
-            self.current_screen_mut().workspaces[workspace].ool_windows.insert(0, ev.window());
+            self.current_screen_mut().workspaces[workspace]
+                .ool_windows
+                .insert(0, ev.window());
         } else {
-            self.current_screen_mut().workspaces[workspace].windows.insert(0, ev.window());
+            self.current_screen_mut().workspaces[workspace]
+                .windows
+                .insert(0, ev.window());
         }
 
         if workspace == self.current_screen().current_wk {
@@ -380,7 +384,9 @@ impl Lapin {
                     }
                 }
             }
-            if set_focus { self.reset_focus_after_removing(s, k, w, ool); }
+            if set_focus {
+                self.reset_focus_after_removing(s, k, w, ool);
+            }
             if !ool {
                 self.current_layout().delwin(
                     &mut self.workspace_windows(),
@@ -401,7 +407,7 @@ impl Lapin {
                         self.current_screen().height,
                         self.current_screen().x,
                         self.current_screen().y,
-                        );
+                    );
                 }
             }
             self.x_connection.flush().ok();
@@ -626,7 +632,6 @@ impl Lapin {
 
     fn change_window_screen(&mut self, previous: bool) {
         if let Some(window) = self.get_focused_window() {
-
             let other_screen = if previous {
                 (self.current_scr as isize) - 1
             } else {
@@ -662,7 +667,7 @@ impl Lapin {
                     self.current_screen().width,
                     self.current_screen().height,
                     self.current_screen().x,
-                    self.current_screen().y
+                    self.current_screen().y,
                 );
             }
             self.x_connection.flush().ok();
@@ -675,7 +680,9 @@ impl Lapin {
                     x::ConfigWindow::Y(self.screens[other_screen].y as i32),
                     x::ConfigWindow::StackMode(x::StackMode::Above),
                 ];
-                self.screens[other_screen].workspaces[other_k].ool_windows.insert(0, window);
+                self.screens[other_screen].workspaces[other_k]
+                    .ool_windows
+                    .insert(0, window);
                 self.x_connection.send_request(&x::ConfigureWindow {
                     window,
                     value_list: &list,
@@ -683,9 +690,13 @@ impl Lapin {
                 self.screens[other_screen].workspaces[other_k].ool_focus = true;
             } else {
                 let other_layout = self.screens[other_screen].workspaces[other_k].layout;
-                self.screens[other_screen].workspaces[other_k].windows.insert(0, window);
+                self.screens[other_screen].workspaces[other_k]
+                    .windows
+                    .insert(0, window);
                 self.config.layouts[other_layout].newwin(
-                    &mut self.screens[other_screen].workspaces[other_k].windows.iter(),
+                    &mut self.screens[other_screen].workspaces[other_k]
+                        .windows
+                        .iter(),
                     &self.x_connection,
                     self.screens[other_screen].width,
                     self.screens[other_screen].height,
@@ -720,7 +731,9 @@ impl Lapin {
                 }
                 x::Event::DestroyNotify(ev) => {
                     last_map = time::SystemTime::now();
-                    let set_focus = if time::SystemTime::now().duration_since(last_mouse_change_focus).unwrap()
+                    let set_focus = if time::SystemTime::now()
+                        .duration_since(last_mouse_change_focus)
+                        .unwrap()
                         > time::Duration::from_millis(100)
                     {
                         true
@@ -800,7 +813,7 @@ impl Lapin {
      * Also, it simply doesn't work with the title ;). Not my falt btw.
      */
 
-    fn get_string_property(&self, window: x::Window, property: x::Atom, ) -> Option<String> {
+    fn get_string_property(&self, window: x::Window, property: x::Atom) -> Option<String> {
         let cookie = self.x_connection.send_request(&x::GetProperty {
             delete: false,
             window,
@@ -840,13 +853,16 @@ impl Lapin {
     }
 
     fn get_class_and_title(&self, window: x::Window) -> Option<(String, String)> {
-
-        let (class1, class2) = if let Some(class) = self.get_string_property(window, x::ATOM_WM_CLASS) {
-            let mut classes = class.split('\0');
-            (classes.next().unwrap().to_string(), classes.next().unwrap().to_string())
-        } else {
-            return None;
-        };
+        let (class1, class2) =
+            if let Some(class) = self.get_string_property(window, x::ATOM_WM_CLASS) {
+                let mut classes = class.split('\0');
+                (
+                    classes.next().unwrap().to_string(),
+                    classes.next().unwrap().to_string(),
+                )
+            } else {
+                return None;
+            };
 
         Some((class1, class2))
     }
