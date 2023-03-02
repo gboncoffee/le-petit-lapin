@@ -326,6 +326,7 @@ impl Lapin {
                 self.current_screen().current_wk,
                 0,
                 ool,
+                true,
             );
         }
         self.add_client_to_atom(ev.window());
@@ -356,7 +357,7 @@ impl Lapin {
         } else {
             self.current_workspace().windows[w]
         };
-        self.set_focus(window, s, k, w, ool);
+        self.set_focus(window, s, k, w, ool, true);
     }
 
     fn unmanage_window(&mut self, window: x::Window, set_focus: bool) {
@@ -414,7 +415,15 @@ impl Lapin {
         }
     }
 
-    fn set_focus(&mut self, window: x::Window, s: usize, k: usize, w: usize, ool: bool) {
+    fn set_focus(
+        &mut self,
+        window: x::Window,
+        s: usize,
+        k: usize,
+        w: usize,
+        ool: bool,
+        raise: bool,
+    ) {
         self.current_scr = s;
         self.current_screen_mut().current_wk = k;
         self.current_workspace_mut().focused = Some(w);
@@ -424,20 +433,22 @@ impl Lapin {
             focus: window,
             time: x::CURRENT_TIME,
         });
-        self.x_connection.send_request(&x::ConfigureWindow {
-            window,
-            value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
-        });
+        if raise {
+            self.x_connection.send_request(&x::ConfigureWindow {
+                window,
+                value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
+            });
+        }
         self.color_focused_border(window);
         self.x_connection.flush().ok();
     }
 
-    fn toggle_focus(&mut self, window: x::Window) {
+    fn toggle_focus(&mut self, window: x::Window, raise: bool) {
         if let Some((s, k, w, ool)) = self.window_location(window) {
             if let Some(window) = self.get_focused_window() {
                 self.restore_border(window);
             }
-            self.set_focus(window, s, k, w, ool);
+            self.set_focus(window, s, k, w, ool, raise);
         }
     }
 
@@ -538,7 +549,7 @@ impl Lapin {
                 self.current_workspace().windows[new_w]
             };
             self.restore_border(self.get_focused_window().unwrap());
-            self.set_focus(window, s, k, new_w, ool);
+            self.set_focus(window, s, k, new_w, ool, true);
             self.x_connection.flush().ok();
             if !ool {
                 self.current_layout().changewin(
@@ -747,7 +758,7 @@ impl Lapin {
                         > time::Duration::from_millis(100)
                     {
                         last_mouse_change_focus = time::SystemTime::now();
-                        self.toggle_focus(ev.event());
+                        self.toggle_focus(ev.event(), self.config.mouse_raises_window);
                     }
                 }
                 x::Event::KeyPress(ev) => {

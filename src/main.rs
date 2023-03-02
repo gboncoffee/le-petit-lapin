@@ -21,15 +21,51 @@ fn main() {
         (&[MODKEY], "7", lazy! {wm, wm.goto_workspace(6)}),
         (&[MODKEY], "8", lazy! {wm, wm.goto_workspace(7)}),
         (&[MODKEY], "9", lazy! {wm, wm.goto_workspace(8)}),
-        (&[MODKEY, "Shift"], "1", lazy! {wm, wm.send_window_to_workspace(0)}),
-        (&[MODKEY, "Shift"], "2", lazy! {wm, wm.send_window_to_workspace(1)}),
-        (&[MODKEY, "Shift"], "3", lazy! {wm, wm.send_window_to_workspace(2)}),
-        (&[MODKEY, "Shift"], "4", lazy! {wm, wm.send_window_to_workspace(3)}),
-        (&[MODKEY, "Shift"], "5", lazy! {wm, wm.send_window_to_workspace(4)}),
-        (&[MODKEY, "Shift"], "6", lazy! {wm, wm.send_window_to_workspace(5)}),
-        (&[MODKEY, "Shift"], "7", lazy! {wm, wm.send_window_to_workspace(6)}),
-        (&[MODKEY, "Shift"], "8", lazy! {wm, wm.send_window_to_workspace(7)}),
-        (&[MODKEY, "Shift"], "9", lazy! {wm, wm.send_window_to_workspace(8)}),
+        (
+            &[MODKEY, "Shift"],
+            "1",
+            lazy! {wm, wm.send_window_to_workspace(0)},
+        ),
+        (
+            &[MODKEY, "Shift"],
+            "2",
+            lazy! {wm, wm.send_window_to_workspace(1)},
+        ),
+        (
+            &[MODKEY, "Shift"],
+            "3",
+            lazy! {wm, wm.send_window_to_workspace(2)},
+        ),
+        (
+            &[MODKEY, "Shift"],
+            "4",
+            lazy! {wm, wm.send_window_to_workspace(3)},
+        ),
+        (
+            &[MODKEY, "Shift"],
+            "5",
+            lazy! {wm, wm.send_window_to_workspace(4)},
+        ),
+        (
+            &[MODKEY, "Shift"],
+            "6",
+            lazy! {wm, wm.send_window_to_workspace(5)},
+        ),
+        (
+            &[MODKEY, "Shift"],
+            "7",
+            lazy! {wm, wm.send_window_to_workspace(6)},
+        ),
+        (
+            &[MODKEY, "Shift"],
+            "8",
+            lazy! {wm, wm.send_window_to_workspace(7)},
+        ),
+        (
+            &[MODKEY, "Shift"],
+            "9",
+            lazy! {wm, wm.send_window_to_workspace(8)},
+        ),
         // quit
         (&[MODKEY], "q", lazy! {Lapin::quit()}),
         // spawns
@@ -65,11 +101,20 @@ fn main() {
         (&[MODKEY], "y", lazy! {wm, wm.prev_screen()}),
         (&[MODKEY], "u", lazy! {wm, wm.next_screen()}),
         // change focused window screen
-        (&[MODKEY, "Shift"], "y", lazy! {wm, wm.send_window_to_prev_screen()}),
-        (&[MODKEY, "Shift"], "u", lazy! {wm, wm.send_window_to_next_screen()}),
+        (
+            &[MODKEY, "Shift"],
+            "y",
+            lazy! {wm, wm.send_window_to_prev_screen()},
+        ),
+        (
+            &[MODKEY, "Shift"],
+            "u",
+            lazy! {wm, wm.send_window_to_next_screen()},
+        ),
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];
+    lapin.config.mouse_raises_window = false;
 
     lapin.config.border_color = 0xff282a36;
     lapin.config.border_color_focus = 0xffff79c6;
