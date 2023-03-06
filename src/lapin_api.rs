@@ -1,7 +1,7 @@
 //! This module defines a bunch of useful public functions to the `Lapin`
 //! struct. Check then on docs for `lapin::Lapin`.
 use crate::config::Config;
-use crate::keys::{match_mods, KeybindSet};
+use crate::keys::{match_mods, Callback, KeybindSet};
 use crate::screens::Screen;
 use crate::{Atoms, Lapin};
 use std::process;
@@ -39,7 +39,11 @@ impl Lapin {
 
     /// The last function that should be called, because it'll start the main
     /// loop and bind keys, efectively never returning.
-    pub fn init(&mut self, keybinds: &mut KeybindSet) {
+    ///
+    /// The last parameter is a callback to be called right before the
+    /// event loop starts, after everything is already set up. As with
+    /// keybinds, you can use the macro `lazy!` to create it.
+    pub fn init(&mut self, keybinds: &mut KeybindSet, callback: Option<&mut Callback>) {
         // bind keys.
         for ((modmask, _, code), _) in keybinds.iter() {
             self.x_connection.send_request(&x::GrabKey {
@@ -99,6 +103,11 @@ impl Lapin {
             focus: self.root,
             time: x::CURRENT_TIME,
         });
+
+        // if has a callback, calls it
+        if let Some(callback) = callback {
+            callback(self);
+        }
 
         self.main_event_loop(keybinds);
     }
@@ -347,7 +356,9 @@ impl Lapin {
                 );
                 self.x_connection.send_request(&x::ConfigureWindow {
                     window,
-                    value_list: &[x::ConfigWindow::BorderWidth(self.current_layout().border_width() as u32)],
+                    value_list: &[x::ConfigWindow::BorderWidth(
+                        self.current_layout().border_width() as u32,
+                    )],
                 });
             } else {
                 let window = self.current_workspace_mut().windows.remove(w);
@@ -365,7 +376,9 @@ impl Lapin {
                 );
                 self.x_connection.send_request(&x::ConfigureWindow {
                     window,
-                    value_list: &[x::ConfigWindow::BorderWidth(self.config.border_width as u32)],
+                    value_list: &[x::ConfigWindow::BorderWidth(
+                        self.config.border_width as u32,
+                    )],
                 });
             }
             self.x_connection.flush().ok();
@@ -391,20 +404,22 @@ impl Lapin {
         if let Some(w) = self.current_workspace().focused {
             let (ool, window) = if self.current_workspace().ool_focus {
                 let window = self.current_workspace_mut().ool_windows.remove(w);
-                self.current_screen_mut().workspaces[workspace].ool_windows.insert(0, window);
+                self.current_screen_mut().workspaces[workspace]
+                    .ool_windows
+                    .insert(0, window);
                 self.current_screen_mut().workspaces[workspace].ool_focus = true;
                 (true, window)
             } else {
                 let window = self.current_workspace_mut().windows.remove(w);
-                self.current_screen_mut().workspaces[workspace].windows.insert(0, window);
+                self.current_screen_mut().workspaces[workspace]
+                    .windows
+                    .insert(0, window);
                 self.current_screen_mut().workspaces[workspace].ool_focus = false;
                 (false, window)
             };
             self.current_screen_mut().workspaces[workspace].focused = Some(0);
 
-            self.x_connection.send_request(&x::UnmapWindow {
-                window,
-            });
+            self.x_connection.send_request(&x::UnmapWindow { window });
             self.x_connection.flush().ok();
 
             self.reset_focus_after_removing(

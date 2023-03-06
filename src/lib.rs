@@ -111,12 +111,20 @@
 //!     // Use the layouts! macro to create a list of layouts.
 //!     lapin.config.layouts = layouts![tile, max, float];
 //!
-//!     // You can autostart stuff easily using the Lapin::spawn.
-//!     Lapin::spawn("picom");
+//!     // With a callback, you can easily access and modify the WM
+//!     // and autostart programs as soon as everything is set up.
+//!     let mut callback = lazy![wm, {
+//!        let home = env!("HOME");
+//!	   Lapin::spawn("picom");
+//!        Lapin::spawn(&format!(
+//!            "feh --no-fehbg --bg-fill {home}/.config/wallpaper"
+//!        ));
+//!        println!("There's {} monitors available", wm.screens.len());
+//!     }];
 //!
 //!     // The last thing to do is starting the window manager with the keybind
-//!     // set with Lapin::init(&mut KeybindSet).
-//!     lapin.init(&mut keybinds);
+//!     // set with Lapin::init(&mut KeybindSet, Option<&mut Callback>).
+//!     lapin.init(&mut keybinds, Some(&mut callback));
 //! }
 //! ```
 
@@ -157,10 +165,17 @@ xcb::atoms_struct! {
 
 /// The window manager I suppose.
 pub struct Lapin {
+    /// The connection with the X server via the XCB crate. Only touch
+    /// it if you know what you're doing.
     pub x_connection: Connection,
+    /// Configuration for the WM.
     pub config: Config,
+    /// Keybinds for the WM.
     pub keybinds: KeybindSet,
+    /// Screens (monitors). Automatically set by Xinerama on
+    /// startup. Don't touch them.
     pub screens: Vec<Screen>,
+    /// Atoms. Only touch them if you know what you're doing.
     pub atoms: Atoms,
     current_scr: usize,
     root: x::Window,
@@ -225,7 +240,7 @@ impl Lapin {
         let mut ool = false;
         let mut workspace = self.current_screen().current_wk;
 
-        let (class1, class2) = if let Some(t) = self.get_class_and_title(window) {
+        let (class1, class2) = if let Some(t) = self.get_class(window) {
             t
         } else {
             return (add_border, ool, workspace);
@@ -863,7 +878,7 @@ impl Lapin {
         Some(prop)
     }
 
-    fn get_class_and_title(&self, window: x::Window) -> Option<(String, String)> {
+    fn get_class(&self, window: x::Window) -> Option<(String, String)> {
         let (class1, class2) =
             if let Some(class) = self.get_string_property(window, x::ATOM_WM_CLASS) {
                 let mut classes = class.split('\0');

@@ -2,6 +2,7 @@ use lapin::keys::*;
 use lapin::layouts::*;
 use lapin::rules::*;
 use lapin::*;
+use std::env;
 
 fn main() {
     let mut lapin = Lapin::connect();
@@ -131,8 +132,14 @@ fn main() {
         rule!(class "qbittorrent" => Apply::Workspace(1)),
     ];
 
-    // Lapin::spawn("picom");
-    Lapin::spawn("feh --no-fehbg --bg-fill /home/gb/.config/wallpaper");
+    let mut callback = lazy![wm, {
+        let home = env!("HOME");
+        Lapin::spawn("picom");
+        Lapin::spawn(&format!(
+            "feh --no-fehbg --bg-fill {home}/.config/wallpaper"
+        ));
+        println!("There's {} monitors available", wm.screens.len());
+    }];
 
-    lapin.init(&mut keybinds);
+    lapin.init(&mut keybinds, Some(&mut callback));
 }

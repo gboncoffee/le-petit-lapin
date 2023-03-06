@@ -21,24 +21,25 @@ pub struct Rule {
 
 impl Rule {
     pub fn new(property: Property, apply: Apply) -> Self {
-        Rule {
-            property,
-            apply,
-        }
+        Rule { property, apply }
     }
 }
 
 /// Macro to easily create rules
 /// ```
-/// rule!(class "Gimp"      => Apply::Fullscreen)
-/// rule!(title "Open File" => Apply::Float)
+/// use lapin::*;
+/// use lapin::rules::*;
+/// rule!(class "Gimp" => Apply::Fullscreen);
+/// rule!(class "QjackCtl" => Apply::Float);
 /// ```
 #[macro_export]
 macro_rules! rule {
     (class $name:literal => $apply:expr) => {
-        Rule { property: Property::Class(String::from($name)), apply: $apply }
-    };
-    // (title $name:literal => $apply:expr) => {
-    //     Rule { property: Property::Title(String::from($name)), apply: $apply }
-    // };
+        Rule {
+            property: Property::Class(String::from($name)),
+            apply: $apply,
+        }
+    }; // (title $name:literal => $apply:expr) => {
+       //     Rule { property: Property::Title(String::from($name)), apply: $apply }
+       // };
 }
