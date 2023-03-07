@@ -8,6 +8,7 @@ use std::process;
 use xcb::x;
 use xcb::xinerama;
 use xcb::Connection;
+use xcb::Xid;
 
 impl Lapin {
     /// The first function that should be called: to connect the window manager
@@ -125,10 +126,12 @@ impl Lapin {
         }
     }
 
-    /// Kills the currently focused window.
+    /// Kills the currently focused client.
     pub fn killfocused(&mut self) {
         let Some(window) = self.get_focused_window() else { return };
-        self.x_connection.send_request(&x::DestroyWindow { window });
+        self.x_connection.send_request(&x::KillClient {
+            resource: window.resource_id(),
+        });
         self.x_connection.flush().ok();
     }
 
