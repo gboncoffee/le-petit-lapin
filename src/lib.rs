@@ -157,7 +157,8 @@ xcb::atoms_struct! {
         pub net_supported => b"_NET_SUPPORTED" only_if_exists = false,
         pub net_wm_name => b"_NET_WM_NAME" only_if_exists = false,
         pub net_wm_state => b"_NET_WM_STATE" only_if_exists = false,
-        pub net_wm_fullscreen => b"_NET_WM_STATE_FULLSCREEN" only_if_exists = false,
+        pub net_wm_state_fullscreen => b"_NET_WM_STATE_FULLSCREEN" only_if_exists = false,
+        pub net_wm_desktop => b"_NET_WM_DESKTOP" only_if_exists = false,
         pub net_wm_window_type => b"_NET_WM_WINDOW_TYPE" only_if_exists = false,
         pub net_wm_window_type_dialog => b"_NET_WM_WINDOW_TYPE_DIALOG" only_if_exists = false,
         pub net_client_list => b"_NET_CLIENT_LIST" only_if_exists = false,
@@ -352,6 +353,15 @@ impl Lapin {
                 true,
             );
         }
+
+        // add the window workspace EWMH hint
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Replace,
+            window: ev.window(),
+            property: self.atoms.net_wm_desktop,
+            r#type: x::ATOM_CARDINAL,
+            data: &[workspace as u32],
+        });
         self.add_client_to_atom(ev.window());
 
         self.x_connection.flush().ok();

@@ -204,6 +204,7 @@ impl Lapin {
                 self.atoms.net_supporting_wm_check,
                 self.atoms.net_desktop_viewport,
                 self.atoms.net_wm_name,
+                self.atoms.net_wm_desktop,
             ],
         });
 
@@ -550,6 +551,15 @@ impl Lapin {
             };
             self.current_screen_mut().workspaces[workspace].focused = Some(0);
 
+            // change the window desktop for EWMH
+            self.x_connection.send_request(&x::ChangeProperty {
+                mode: x::PropMode::Replace,
+                window,
+                property: self.atoms.net_wm_desktop,
+                r#type: x::ATOM_CARDINAL,
+                data: &[workspace as u32],
+            });
+            // unmaps window
             self.x_connection.send_request(&x::UnmapWindow { window });
             self.x_connection.flush().ok();
 
