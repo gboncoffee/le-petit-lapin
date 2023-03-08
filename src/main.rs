@@ -8,7 +8,7 @@ use std::env;
 fn main() {
     let mut lapin = Lapin::connect();
 
-    const MODKEY: &str = "Meta";
+    const MODKEY: &str = "Super";
     const TERMINAL: &str = "alacritty";
 
     let mut keybinds = KeybindSet::new();

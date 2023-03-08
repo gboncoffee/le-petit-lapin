@@ -145,6 +145,7 @@ use xcb::x;
 use xcb::Connection;
 use xcb::Xid;
 
+#[rustfmt::skip]
 xcb::atoms_struct! {
     /// Atoms struct for the window manager.
     pub struct Atoms {
@@ -160,6 +161,13 @@ xcb::atoms_struct! {
         pub net_wm_window_type => b"_NET_WM_WINDOW_TYPE" only_if_exists = false,
         pub net_wm_window_type_dialog => b"_NET_WM_WINDOW_TYPE_DIALOG" only_if_exists = false,
         pub net_client_list => b"_NET_CLIENT_LIST" only_if_exists = false,
+	pub net_number_of_desktops => b"_NET_NUMBER_OF_DESKTOPS" only_if_exists = false,
+	pub net_desktop_geometry => b"_NET_DESKTOP_GEOMETRY" only_if_exists = false,
+	pub net_desktop_viewport => b"_NET_DESKTOP_VIEWPORT" only_if_exists = false,
+	pub net_current_desktop => b"_NET_CURRENT_DESKTOP" only_if_exists = false,
+	pub net_desktop_names => b"_NET_DESKTOP_NAMES" only_if_exists = false,
+	pub net_workarea => b"_NET_WORKAREA" only_if_exists = false,
+	pub net_supporting_wm_check => b"_NET_SUPPORTING_WM_CHECK" only_if_exists = false,
     }
 }
 
@@ -229,7 +237,7 @@ impl Lapin {
             mode: x::PropMode::Append,
             window: self.root,
             property: self.atoms.net_client_list,
-            r#type: self.atoms.net_client_list,
+            r#type: x::ATOM_WINDOW,
             data: &window.resource_id().to_ne_bytes(),
         });
     }
@@ -386,7 +394,7 @@ impl Lapin {
                 mode: x::PropMode::Replace,
                 window: self.root,
                 property: self.atoms.net_client_list,
-                r#type: self.atoms.net_client_list,
+                r#type: x::ATOM_WINDOW,
                 data: &[],
             });
             self.x_connection.flush().ok();
@@ -651,6 +659,15 @@ impl Lapin {
             revert_to: x::InputFocus::PointerRoot,
             focus: window,
             time: x::CURRENT_TIME,
+        });
+
+        // change the current workspace for ewmh
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Replace,
+            window: self.root,
+            property: self.atoms.net_current_desktop,
+            r#type: x::ATOM_CARDINAL,
+            data: &[self.current_screen().current_wk as u32],
         });
 
         self.x_connection.flush().ok();

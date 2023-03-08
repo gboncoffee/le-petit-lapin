@@ -105,10 +105,122 @@ impl Lapin {
             time: x::CURRENT_TIME,
         });
 
+        //
+        // setup atoms for EWMH and stuff.
+        //
+
+        // check window
+        let window: x::Window = self.x_connection.generate_id();
+        self.x_connection.send_request(&x::CreateWindow {
+            depth: x::COPY_FROM_PARENT as u8,
+            wid: window,
+            parent: self.root,
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+            border_width: 0,
+            class: x::WindowClass::InputOutput,
+            visual: self
+                .x_connection
+                .get_setup()
+                .roots()
+                .next()
+                .unwrap()
+                .root_visual(),
+            value_list: &[],
+        });
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Append,
+            window: self.root,
+            property: self.atoms.net_supporting_wm_check,
+            r#type: x::ATOM_WINDOW,
+            data: &[window],
+        });
+
+        // client list
+        self.x_connection
+            .send_request(&x::ChangeProperty::<x::Window> {
+                mode: x::PropMode::Append,
+                window: self.root,
+                property: self.atoms.net_client_list,
+                r#type: x::ATOM_WINDOW,
+                data: &[],
+            });
+
+        // desktops number and names
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Append,
+            window: self.root,
+            property: self.atoms.net_number_of_desktops,
+            r#type: x::ATOM_CARDINAL,
+            data: &[self.config.workspaces.len() as u32],
+        });
+        // transform the array of &'static str in a vec of u8
+        let mut c_str_vec: Vec<u8> = Vec::new();
+        for wk in self.config.workspaces {
+            for ch in wk.as_bytes() {
+                c_str_vec.push(*ch);
+            }
+            c_str_vec.push('\0' as u8);
+        }
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Append,
+            window: self.root,
+            property: self.atoms.net_desktop_names,
+            r#type: x::ATOM_STRING,
+            data: &c_str_vec[..],
+        });
+
+        // desktop viewport
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Append,
+            window: self.root,
+            property: self.atoms.net_desktop_viewport,
+            r#type: x::ATOM_CARDINAL,
+            data: &[0 as u32, 0 as u32],
+        });
+
+        // WM name
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Append,
+            window: self.root,
+            property: self.atoms.net_wm_name,
+            r#type: x::ATOM_STRING,
+            data: b"Le Petit Lapin",
+        });
+
+        // set the supported atoms
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Append,
+            window: self.root,
+            property: self.atoms.net_supported,
+            r#type: x::ATOM_ATOM,
+            data: &[
+                self.atoms.net_supported,
+                self.atoms.net_client_list,
+                self.atoms.net_number_of_desktops,
+                self.atoms.net_current_desktop,
+                self.atoms.net_supporting_wm_check,
+                self.atoms.net_desktop_viewport,
+                self.atoms.net_wm_name,
+            ],
+        });
+
         // if has a callback, calls it
         if let Some(callback) = callback {
             callback(self);
         }
+
+        // current desktop is set after the callback so the user can
+        // change it without pain if wishes.
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Append,
+            window: self.root,
+            property: self.atoms.net_current_desktop,
+            r#type: x::ATOM_CARDINAL,
+            data: &[self.current_screen().current_wk as u32],
+        });
 
         self.main_event_loop(keybinds);
     }
@@ -157,6 +269,9 @@ impl Lapin {
 
     /// Change current workspace.
     pub fn goto_workspace(&mut self, wk: usize) {
+        if self.current_screen().current_wk == wk {
+            return;
+        }
         for window in &self.current_workspace().windows {
             self.x_connection
                 .send_request(&x::UnmapWindow { window: *window });
@@ -167,6 +282,14 @@ impl Lapin {
         }
         self.x_connection.flush().ok();
         self.current_screen_mut().current_wk = wk;
+        // change the property for the sake of ewmh
+        self.x_connection.send_request(&x::ChangeProperty {
+            mode: x::PropMode::Replace,
+            window: self.root,
+            property: self.atoms.net_current_desktop,
+            r#type: x::ATOM_CARDINAL,
+            data: &[self.current_screen().current_wk as u32],
+        });
         for window in &self.current_workspace().windows {
             self.x_connection
                 .send_request(&x::MapWindow { window: *window });
@@ -177,9 +300,14 @@ impl Lapin {
         }
         self.x_connection.flush().ok();
         if let Some(focus) = self.current_workspace().focused {
+            let focused = if self.current_workspace().ool_focus {
+                self.current_workspace().ool_windows[focus]
+            } else {
+                self.current_workspace().windows[focus]
+            };
             self.x_connection.send_request(&x::SetInputFocus {
                 revert_to: x::InputFocus::PointerRoot,
-                focus: self.current_workspace().windows[focus],
+                focus: focused,
                 time: x::CURRENT_TIME,
             });
         } else {

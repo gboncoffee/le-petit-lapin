@@ -12,5 +12,4 @@ French.
 
 ## TODO
 
-- A bar;
 - EWMH.
