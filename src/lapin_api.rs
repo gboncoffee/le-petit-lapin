@@ -184,7 +184,7 @@ impl Lapin {
         // WM name
         self.x_connection.send_request(&x::ChangeProperty {
             mode: x::PropMode::Append,
-            window: self.root,
+            window: window,
             property: self.atoms.net_wm_name,
             r#type: x::ATOM_STRING,
             data: b"Le Petit Lapin",
