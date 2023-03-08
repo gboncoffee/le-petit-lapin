@@ -46,7 +46,9 @@ pub struct Workspace {
     pub windows: Vec<x::Window>,
     pub ool_windows: Vec<x::Window>,
     pub layout: usize,
+    pub respect_reserved_space: bool,
 }
+
 impl Workspace {
     /// Creates a new workspace. The `Lapin::init()` function should create then
     /// based in the config struct. Only create then manually if you know what
@@ -59,6 +61,7 @@ impl Workspace {
             windows: Vec::new(),
             ool_windows: Vec::new(),
             layout: 0,
+            respect_reserved_space: true,
         }
     }
 }

@@ -318,13 +318,14 @@ impl Lapin {
                 time: x::CURRENT_TIME,
             });
         }
+        let (width, height, x, y) = self.calculate_layout_coordinates();
         self.current_layout().reload(
             &mut self.workspace_windows(),
             &self.x_connection,
-            self.current_screen().width,
-            self.current_screen().height,
-            self.current_screen().x,
-            self.current_screen().y,
+            width,
+            height,
+            x,
+            y,
         );
         self.x_connection.flush().ok();
     }
@@ -336,13 +337,14 @@ impl Lapin {
         }
         if let Some(cur_w) = self.current_workspace().focused {
             self.current_workspace_mut().windows.rotate_left(1);
+            let (width, height, x, y) = self.calculate_layout_coordinates();
             self.current_layout().reload(
                 &mut self.workspace_windows(),
                 &self.x_connection,
-                self.current_screen().width,
-                self.current_screen().height,
-                self.current_screen().x,
-                self.current_screen().y,
+                width,
+                height,
+                x,
+                y,
             );
             self.current_workspace_mut().focused = if cur_w == 0 {
                 Some(self.current_workspace().windows.len() - 1)
@@ -359,13 +361,14 @@ impl Lapin {
         }
         if let Some(cur_w) = self.current_workspace().focused {
             self.current_workspace_mut().windows.rotate_right(1);
+            let (width, height, x, y) = self.calculate_layout_coordinates();
             self.current_layout().reload(
                 &mut self.workspace_windows(),
                 &self.x_connection,
-                self.current_screen().width,
-                self.current_screen().height,
-                self.current_screen().x,
-                self.current_screen().y,
+                width,
+                height,
+                x,
+                y,
             );
             self.current_workspace_mut().focused =
                 if cur_w == self.current_workspace().windows.len() - 1 {
@@ -398,13 +401,14 @@ impl Lapin {
 
             self.current_workspace_mut().focused = Some(next_w);
 
+            let (width, height, x, y) = self.calculate_layout_coordinates();
             self.current_layout().reload(
                 &mut self.workspace_windows(),
                 &self.x_connection,
-                self.current_screen().width,
-                self.current_screen().height,
-                self.current_screen().x,
-                self.current_screen().y,
+                width,
+                height,
+                x,
+                y,
             );
         }
     }
@@ -431,13 +435,14 @@ impl Lapin {
 
             self.current_workspace_mut().focused = Some(prev_w);
 
+            let (width, height, x, y) = self.calculate_layout_coordinates();
             self.current_layout().reload(
                 &mut self.workspace_windows(),
                 &self.x_connection,
-                self.current_screen().width,
-                self.current_screen().height,
-                self.current_screen().x,
-                self.current_screen().y,
+                width,
+                height,
+                x,
+                y,
             );
         }
     }
@@ -460,15 +465,32 @@ impl Lapin {
             self.current_workspace_mut().windows[other_w] = tmp;
             self.current_workspace_mut().focused = Some(other_w);
 
+            let (width, height, x, y) = self.calculate_layout_coordinates();
             self.current_layout().reload(
                 &mut self.workspace_windows(),
                 &self.x_connection,
-                self.current_screen().width,
-                self.current_screen().height,
-                self.current_screen().x,
-                self.current_screen().y,
+                width,
+                height,
+                x,
+                y,
             );
         }
+    }
+
+    /// Toggles the reserved space in the current workspace.
+    pub fn toggle_reserved_space(&mut self) {
+        self.current_workspace_mut().respect_reserved_space =
+            !self.current_workspace().respect_reserved_space;
+        let (width, height, x, y) = self.calculate_layout_coordinates();
+        self.current_layout().reload(
+            &mut self.workspace_windows(),
+            &self.x_connection,
+            width,
+            height,
+            x,
+            y,
+        );
+        self.x_connection.flush().ok();
     }
 
     pub fn toggle_ool(&mut self) {
@@ -478,13 +500,14 @@ impl Lapin {
                 self.current_workspace_mut().windows.insert(0, window);
                 self.current_workspace_mut().ool_focus = false;
                 self.current_workspace_mut().focused = Some(0);
+                let (width, height, x, y) = self.calculate_layout_coordinates();
                 self.current_layout().newwin(
                     &mut self.workspace_windows(),
                     &self.x_connection,
-                    self.current_screen().width,
-                    self.current_screen().height,
-                    self.current_screen().x,
-                    self.current_screen().y,
+                    width,
+                    height,
+                    x,
+                    y,
                 );
                 self.x_connection.send_request(&x::ConfigureWindow {
                     window,
@@ -497,14 +520,15 @@ impl Lapin {
                 self.current_workspace_mut().ool_windows.insert(0, window);
                 self.current_workspace_mut().ool_focus = true;
                 self.current_workspace_mut().focused = Some(0);
+                let (width, height, x, y) = self.calculate_layout_coordinates();
                 self.current_layout().delwin(
                     &mut self.workspace_windows(),
                     self.current_workspace().focused,
                     &self.x_connection,
-                    self.current_screen().width,
-                    self.current_screen().height,
-                    self.current_screen().x,
-                    self.current_screen().y,
+                    width,
+                    height,
+                    x,
+                    y,
                 );
                 self.x_connection.send_request(&x::ConfigureWindow {
                     window,
@@ -572,14 +596,15 @@ impl Lapin {
             self.x_connection.flush().ok();
 
             if !ool {
+                let (width, height, x, y) = self.calculate_layout_coordinates();
                 self.current_layout().delwin(
                     &mut self.workspace_windows(),
                     self.current_workspace().focused,
                     &self.x_connection,
-                    self.current_screen().width,
-                    self.current_screen().height,
-                    self.current_screen().x,
-                    self.current_screen().y,
+                    width,
+                    height,
+                    x,
+                    y,
                 );
             }
             self.x_connection.flush().ok();

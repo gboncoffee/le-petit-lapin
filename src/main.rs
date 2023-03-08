@@ -61,6 +61,8 @@ fn main() {
         // change focused window screen
         (&[MODKEY, "Shift"], "y", lazy! {wm, wm.send_window_to_prev_screen()}),
         (&[MODKEY, "Shift"], "u", lazy! {wm, wm.send_window_to_next_screen()}),
+	// toggle bar
+        (&[MODKEY, "Shift"], "b", lazy! {wm, wm.toggle_reserved_space()}),
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];
@@ -68,6 +70,8 @@ fn main() {
 
     lapin.config.border_color = 0xff282a36;
     lapin.config.border_color_focus = 0xffff79c6;
+
+    lapin.config.reserved_space = (40, 10, 10, 10);
 
     let tile = Tiling::new();
     let max = Maximized::new();

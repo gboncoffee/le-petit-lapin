@@ -283,6 +283,29 @@ impl Lapin {
         return (add_border, ool, workspace);
     }
 
+    /// Calculates size and coordinates for sending to layouts, in the
+    /// format (width, height, x, y).
+    fn calculate_layout_coordinates(&self) -> (u16, u16, i16, i16) {
+        if self.current_workspace().respect_reserved_space {
+            let width = self.current_screen().width
+                - self.config.reserved_space.1
+                - self.config.reserved_space.3;
+            let height = self.current_screen().height
+                - self.config.reserved_space.0
+                - self.config.reserved_space.2;
+            let x = self.current_screen().x + self.config.reserved_space.3 as i16;
+            let y = self.current_screen().y + self.config.reserved_space.0 as i16;
+            (width, height, x, y)
+        } else {
+            (
+                self.current_screen().width,
+                self.current_screen().height,
+                self.current_screen().x,
+                self.current_screen().y,
+            )
+        }
+    }
+
     fn manage_window(&mut self, ev: x::MapRequestEvent) {
         // check if we really need to manage the window
         if self.window_location(ev.window()).is_some() {
@@ -333,13 +356,14 @@ impl Lapin {
         }
 
         if workspace == self.current_screen().current_wk {
+            let (width, height, x, y) = self.calculate_layout_coordinates();
             self.current_layout().newwin(
                 &mut self.workspace_windows(),
                 &self.x_connection,
-                self.current_screen().width,
-                self.current_screen().height,
-                self.current_screen().x,
-                self.current_screen().y,
+                width,
+                height,
+                x,
+                y,
             );
             self.x_connection.send_request(&x::MapWindow {
                 window: ev.window(),
@@ -422,25 +446,27 @@ impl Lapin {
                 self.reset_focus_after_removing(s, k, w, ool);
             }
             if !ool {
+                let (width, height, x, y) = self.calculate_layout_coordinates();
                 self.current_layout().delwin(
                     &mut self.workspace_windows(),
                     self.current_workspace().focused,
                     &self.x_connection,
-                    self.current_screen().width,
-                    self.current_screen().height,
-                    self.current_screen().x,
-                    self.current_screen().y,
+                    width,
+                    height,
+                    x,
+                    y,
                 );
             } else if !self.current_workspace().ool_focus {
                 if let Some(number) = self.current_workspace().focused {
+                    let (width, height, x, y) = self.calculate_layout_coordinates();
                     self.current_layout().changewin(
                         &mut self.workspace_windows(),
                         number,
                         &self.x_connection,
-                        self.current_screen().width,
-                        self.current_screen().height,
-                        self.current_screen().x,
-                        self.current_screen().y,
+                        width,
+                        height,
+                        x,
+                        y,
                     );
                 }
             }
@@ -585,14 +611,15 @@ impl Lapin {
             self.set_focus(window, s, k, new_w, ool, true);
             self.x_connection.flush().ok();
             if !ool {
+                let (width, height, x, y) = self.calculate_layout_coordinates();
                 self.current_layout().changewin(
                     &mut self.workspace_windows(),
                     new_w,
                     &self.x_connection,
-                    self.current_screen().width,
-                    self.current_screen().height,
-                    self.current_screen().x,
-                    self.current_screen().y,
+                    width,
+                    height,
+                    x,
+                    y,
                 );
             }
         }
@@ -629,13 +656,14 @@ impl Lapin {
 
         self.x_connection.flush().ok();
 
+        let (width, height, x, y) = self.calculate_layout_coordinates();
         self.current_layout().reload(
             &mut self.workspace_windows(),
             &self.x_connection,
-            self.current_screen().width,
-            self.current_screen().height,
-            self.current_screen().x,
-            self.current_screen().y,
+            width,
+            height,
+            x,
+            y,
         );
         self.x_connection.flush().ok();
     }
@@ -713,14 +741,15 @@ impl Lapin {
             self.restore_border(window);
 
             if !ool {
+                let (width, height, x, y) = self.calculate_layout_coordinates();
                 self.current_layout().delwin(
                     &mut self.workspace_windows(),
                     self.current_workspace().focused,
                     &self.x_connection,
-                    self.current_screen().width,
-                    self.current_screen().height,
-                    self.current_screen().x,
-                    self.current_screen().y,
+                    width,
+                    height,
+                    x,
+                    y,
                 );
             }
             self.x_connection.flush().ok();

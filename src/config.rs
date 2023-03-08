@@ -19,6 +19,9 @@ pub struct Config {
     pub border_color_focus: u32,
     /// Border width of ool windows. Defaults to `4`.
     pub border_width: u32,
+    /// Space in the sides to reserve for a bar. In the format (top,
+    /// right, bottom, left). Defaults to (0, 0, 0, 0).
+    pub reserved_space: (u16, u16, u16, u16),
     /// Layouts to use. Defaults to the three built-in layouts with
     /// default configs.
     pub layouts: Vec<Box<dyn Layout>>,
@@ -39,6 +42,7 @@ impl Config {
             border_color: 0xff000000,
             border_color_focus: 0xffffffff,
             border_width: 4,
+            reserved_space: (0, 0, 0, 0),
             mouse_raises_window: true,
             layouts: vec![
                 Box::new(Tiling::new()),
