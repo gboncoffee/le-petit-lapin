@@ -387,8 +387,8 @@ impl Layout for Maximized {
 /// # Example
 ///
 /// ```no_run
-/// use lapin::*;
-/// use lapin::layouts::*;
+/// use le_petit_lapin::*;
+/// use le_petit_lapin::layouts::*;
 /// let mut lapin = Lapin::connect();
 /// let tile = Tiling {
 ///     name: "tile",

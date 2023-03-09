@@ -35,8 +35,8 @@ impl Rule {
 
 /// Macro to easily create rules
 /// ```
-/// use lapin::*;
-/// use lapin::rules::*;
+/// use le_petit_lapin::*;
+/// use le_petit_lapin::rules::*;
 /// rule!(class "Gimp" => Apply::Fullscreen);
 /// rule!(class "QjackCtl" => Apply::Float);
 /// ```

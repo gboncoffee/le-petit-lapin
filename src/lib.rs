@@ -20,7 +20,7 @@
 //!
 //! # Le Petit Lapin - The cute X window manager.
 //!
-//! [Source repository](https://github.com/gboncoffee/lapin)
+//! [Source repository](https://github.com/gboncoffee/le-petit-lapin)
 //!
 //! Le Petit Lapin is a X window manager written in Rust as a library. One must
 //! create a binary Cargo crate that depends on `lapin` to build it with a desired
@@ -40,9 +40,9 @@
 //! To use Lapin is to write your own window manager in Rust, depending on this
 //! crate. The most minimal config looks like this:
 //! ```no_run
-//! use lapin::keys::*;
-//! use lapin::layouts::*;
-//! use lapin::*;
+//! use le_petit_lapin::keys::*;
+//! use le_petit_lapin::layouts::*;
+//! use le_petit_lapin::*;
 //! use std::env;
 //!
 //! #[rustfmt::skip]

@@ -1,6 +1,6 @@
-use lapin::keys::*;
-use lapin::layouts::*;
-use lapin::*;
+use le_petit_lapin::keys::*;
+use le_petit_lapin::layouts::*;
+use le_petit_lapin::*;
 use std::env;
 
 #[rustfmt::skip]

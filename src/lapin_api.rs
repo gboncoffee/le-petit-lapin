@@ -1,5 +1,5 @@
 //! This module defines a bunch of useful public functions to the `Lapin`
-//! struct. Check then on docs for `lapin::Lapin`.
+//! struct. Check then on docs for `Lapin`.
 use crate::config::Config;
 use crate::keys::{match_mods, Callback, KeybindSet};
 use crate::screens::Screen;

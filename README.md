@@ -1,8 +1,8 @@
 # Le Petit Lapin
 
-Le Petit Lapin is a X window manager written in Rust as a library. One must
-create a binary Cargo crate that depends on `lapin` to build it with a desired
-configuration.
+Le Petit Lapin is a X window manager written in Rust as a library. One
+must create a binary Cargo crate that depends on `le-petit-lapin` to
+build it with a desired configuration.
 
 The name "Le petit lapin" was choosen by a friend of mine and it means "The 
 little bunny" in French, but I'm not 100% sure about that because I don't speak
@@ -20,16 +20,16 @@ operating system package manager.
 Next, go/create to the directory where you want to keep your
 configuration. Example:
 
-`$ mkdir -p ~/.config/lapin`
-`$ cd ~/.config/lapin`
+`$ mkdir -p ~/.config/le-petit-lapin`
+`$ cd ~/.config/le-petit-lapin`
 
 Init a new Cargo crate:
 
 `$ cargo init`
 
-Add `lapin` as a dependency:
+Add `le-petit-lapin` as a dependency:
 
-`$ cargo add lapin`
+`$ cargo add le-petit-lapin`
 
 Optionally open the official documentation to use as a reference when
 configuring. Open your favorite web browser and then run the following
@@ -45,7 +45,7 @@ documentation. After configuring, build your window manager:
 
 `$ cargo build --release`
 
-The binary will be placed in `target/release/lapin`.
+The binary will be placed in `target/release/`.
 
 To log in your new window manager, you have some options:
 
@@ -61,7 +61,7 @@ will start Lapin.
 If you want to login from a display manager, you can [use your
 .xinitrc as a
 session](https://wiki.archlinux.org/title/Display_manager#Run_~/.xinitrc_as_a_session)
-or add a file like this in `/usr/share/xsessions/`, named `lapin.dekstop`:
+or add a file like this in `/usr/share/xsessions/`, named `le-petit-lapin.dekstop`:
 
 ```
 [Desktop Entry]
@@ -78,5 +78,5 @@ multiple users using Lapin.
 
 ## Configuring
 
-Check out the [GitHub wiki](https://github.com/gboncoffee/lapin/wiki)
+Check out the [GitHub wiki](https://github.com/gboncoffee/le-petit-lapin/wiki)
 for config examples and snippets.

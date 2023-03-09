@@ -99,8 +99,8 @@ impl KeybindSet {
     ///
     /// # Example
     /// ```no_run
-    /// use lapin::keys::*;
-    /// use lapin::*;
+    /// use le_petit_lapin::keys::*;
+    /// use le_petit_lapin::*;
     /// let mut keybinds = KeybindSet::new();
     /// keybinds.bindall(vec![
     ///     (&["Super"], "1", lazy! {wm, wm.goto_workspace(1)}),
@@ -151,8 +151,8 @@ impl KeybindSet {
 ///
 /// # Example
 /// ```no_run
-/// use lapin::keys::*;
-/// use lapin::*;
+/// use le_petit_lapin::keys::*;
+/// use le_petit_lapin::*;
 /// let mut keybinds = KeybindSet::new();
 /// keybinds.bindall(vec![
 ///     // closure that calls the main `Lapin` struct.
