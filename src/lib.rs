@@ -158,6 +158,7 @@ xcb::atoms_struct! {
         pub net_wm_name => b"_NET_WM_NAME" only_if_exists = false,
         pub net_wm_state => b"_NET_WM_STATE" only_if_exists = false,
         pub net_wm_state_fullscreen => b"_NET_WM_STATE_FULLSCREEN" only_if_exists = false,
+	pub net_wm_action_fullscreen => b"_NET_WM_ACTION_FULLSCREEN" only_if_exists = false,
         pub net_wm_desktop => b"_NET_WM_DESKTOP" only_if_exists = false,
         pub net_wm_window_type => b"_NET_WM_WINDOW_TYPE" only_if_exists = false,
         pub net_wm_window_type_dialog => b"_NET_WM_WINDOW_TYPE_DIALOG" only_if_exists = false,
@@ -275,6 +276,13 @@ impl Lapin {
                         self.x_connection.flush().ok();
                         ool = true;
                         add_border = false;
+                        self.x_connection.send_request(&x::ChangeProperty {
+                            mode: x::PropMode::Replace,
+                            window: window,
+                            property: self.atoms.net_wm_state,
+                            r#type: x::ATOM_ATOM,
+                            data: &[self.atoms.net_wm_state_fullscreen],
+                        });
                     }
                 }
             }
@@ -852,6 +860,62 @@ impl Lapin {
                             let win = move_window.unwrap();
                             self.handle_motion(ev, x_d, y_d, x_p, y_p, win);
                         }
+                    }
+                }
+                x::Event::ClientMessage(ev) => {
+                    // LOL THIS IS A BIG WORKAROUND, but xcb really
+                    // doesn't give much support for me to
+                    // implementing this. I made some really
+                    // scientific measurements and came to the
+                    // conclusion that 357 is the magic number for
+                    // fullscreen, and 358 is when it's set idk lol.
+                    if ev.r#type().resource_id() == 357 {
+                        let cookie = self.x_connection.send_request(&x::GetProperty {
+                            delete: false,
+                            window: ev.window(),
+                            property: self.atoms.net_wm_state,
+                            r#type: x::ATOM_ATOM,
+                            long_offset: 0,
+                            long_length: 0,
+                        });
+                        let reply = self
+                            .x_connection
+                            .wait_for_reply(cookie)
+                            .expect("Connection to the X server failed");
+                        let cookie = self.x_connection.send_request(&x::GetProperty {
+                            delete: false,
+                            window: ev.window(),
+                            property: self.atoms.net_wm_state,
+                            r#type: x::ATOM_ATOM,
+                            long_offset: 0,
+                            long_length: reply.bytes_after(),
+                        });
+                        let reply = self
+                            .x_connection
+                            .wait_for_reply(cookie)
+                            .expect("Connection to the X server failed");
+                        let mut is_fullscreen = false;
+                        for r in reply.value::<x::Atom>().iter() {
+                            if r.resource_id() == 358 {
+                                is_fullscreen = true;
+                            }
+                        }
+
+                        self.toggle_focus(ev.window(), true);
+                        if is_fullscreen {
+                            self.toggle_ool();
+                            self.x_connection
+                                .send_request(&x::ChangeProperty::<x::Atom> {
+                                    mode: x::PropMode::Replace,
+                                    window: ev.window(),
+                                    property: self.atoms.net_wm_state,
+                                    r#type: x::ATOM_ATOM,
+                                    data: &[],
+                                });
+                        } else {
+                            self.fullscreen();
+                        }
+                        self.x_connection.flush().ok();
                     }
                 }
                 _ => {}

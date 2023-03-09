@@ -205,6 +205,9 @@ impl Lapin {
                 self.atoms.net_desktop_viewport,
                 self.atoms.net_wm_name,
                 self.atoms.net_wm_desktop,
+                self.atoms.net_wm_state,
+                self.atoms.net_wm_state_fullscreen,
+                self.atoms.net_wm_action_fullscreen,
             ],
         });
 
@@ -536,6 +539,14 @@ impl Lapin {
                         self.config.border_width as u32,
                     )],
                 });
+                self.x_connection
+                    .send_request(&x::ChangeProperty::<x::Atom> {
+                        mode: x::PropMode::Replace,
+                        window,
+                        property: self.atoms.net_wm_state,
+                        r#type: x::ATOM_ATOM,
+                        data: &[],
+                    });
             }
             self.x_connection.flush().ok();
         }
@@ -643,6 +654,13 @@ impl Lapin {
             self.x_connection.send_request(&x::ConfigureWindow {
                 window,
                 value_list: &list,
+            });
+            self.x_connection.send_request(&x::ChangeProperty {
+                mode: x::PropMode::Replace,
+                window: window,
+                property: self.atoms.net_wm_state,
+                r#type: x::ATOM_ATOM,
+                data: &[self.atoms.net_wm_state_fullscreen],
             });
             self.x_connection.flush().ok();
         }
