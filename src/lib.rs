@@ -452,6 +452,17 @@ impl Lapin {
             }
             if set_focus {
                 self.reset_focus_after_removing(s, k, w, ool);
+            } else if let Some(focused) = self.current_workspace().focused {
+                // fix focus when EnterNotify called before
+                // DestroyNotify set the focus to an ool window after
+                // removing another ool window
+                if ool
+                    && self.current_workspace().ool_focus
+                    && focused >= self.current_workspace().ool_windows.len()
+                    && self.current_workspace().ool_windows.len() > 0
+                {
+                    self.current_workspace_mut().focused = Some(focused - 1);
+                }
             }
             if !ool {
                 let (width, height, x, y) = self.calculate_layout_coordinates();
