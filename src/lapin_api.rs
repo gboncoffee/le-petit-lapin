@@ -226,6 +226,8 @@ impl Lapin {
             data: &[self.current_screen().current_wk as u32],
         });
 
+        self.x_connection.flush().ok();
+
         self.main_event_loop(keybinds);
     }
 
