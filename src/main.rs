@@ -79,11 +79,11 @@ fn main() {
     // Check all config options in docs for the Config struct.
     //
 
-    let mut callback = lazy! {wm, {
+    let mut callback = lazy! {{
 	let home = env!("HOME");
 	Lapin::spawn("picom");
 	Lapin::spawn(&format!("feh --no-fehbg --bg-fill {home}/.config/wallpaper"));
     }};
 
-    lapin.init(&mut keybinds, Some(callback));
+    lapin.init(&mut keybinds, Some(&mut callback));
 }

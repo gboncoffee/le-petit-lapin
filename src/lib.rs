@@ -131,7 +131,7 @@
 //!
 //!     // We can assign a closure to be called right after everything
 //!     // is setup.
-//!     let mut callback = lazy! {wm, {
+//!     let mut callback = lazy! {{
 //!         let home = env!("HOME");
 //!         Lapin::spawn("picom");
 //!         Lapin::spawn(&format!("feh --no-fehbg --bg-fill {home}/.config/wallpaper"));
@@ -139,7 +139,7 @@
 //!
 //!     // The last thing to do is init the window manager object with
 //!     // the keybinds and the callback.
-//!     lapin.init(&mut keybinds, Some(callback));
+//!     lapin.init(&mut keybinds, Some(&mut callback));
 //! }
 //! ```
 
