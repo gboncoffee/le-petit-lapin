@@ -20,7 +20,7 @@ To use this window manager you must have the Rust build system,
 website](https://www.rust-lang.org/learn/get-started) or with your
 operating system package manager.
 
-Next, go/create to the directory where you want to keep your
+Next, create or go to the directory where you want to keep your
 configuration. Example:
 
 `$ mkdir -p ~/.config/le-petit-lapin`  
