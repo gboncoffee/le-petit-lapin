@@ -23,7 +23,7 @@ operating system package manager.
 Next, go/create to the directory where you want to keep your
 configuration. Example:
 
-`$ mkdir -p ~/.config/le-petit-lapin`
+`$ mkdir -p ~/.config/le-petit-lapin`  
 `$ cd ~/.config/le-petit-lapin`
 
 Init a new Cargo crate:
