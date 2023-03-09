@@ -1,3 +1,4 @@
+![Screenshot](assets/first-rice-tilling-windows.png)
 # Le Petit Lapin
 
 Le Petit Lapin is a X window manager written in Rust as a library. One
@@ -9,6 +10,8 @@ little bunny" in French, but I'm not 100% sure about that because I don't speak
 French.
 
 To use this crate, you'll need both XCB and Xlib installed.
+
+Check other screenshots in the end of this README!
 
 ## Quickstart
 
@@ -80,3 +83,9 @@ multiple users using Lapin.
 
 Check out the [GitHub wiki](https://github.com/gboncoffee/le-petit-lapin/wiki)
 for config examples and snippets.
+
+![Screenshot](assets/first-rice-floating-windows.png)
+
+![Screenshot](assets/first-rice-showing-emacs.png)
+
+![Screenshot](assets/first-rice-onefetch.png)
