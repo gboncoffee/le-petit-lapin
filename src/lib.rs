@@ -31,7 +31,9 @@
 //! French.
 //!
 //! This is the official API and code documentation. Check out config
-//! examples and snippets in the wiki:
+//! examples and snippets in the wiki, on the source repository.
+//!
+//! To use this crate you'll need both XCB and Xlib installed.
 //!
 //! ## Quickstart
 //!
