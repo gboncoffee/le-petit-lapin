@@ -20,6 +20,8 @@
 //!
 //! # Le Petit Lapin - The cute X window manager.
 //!
+//! [Source repository](https://github.com/gboncoffee/lapin)
+//!
 //! Le Petit Lapin is a X window manager written in Rust as a library. One must
 //! create a binary Cargo crate that depends on `lapin` to build it with a desired
 //! configuration.
@@ -28,49 +30,54 @@
 //! little bunny" in French, but I'm not 100% sure about that because I don't speak
 //! French.
 //!
+//! This is the official API and code documentation. Check out config
+//! examples and snippets in the wiki:
+//!
 //! ## Quickstart
 //!
 //! To use Lapin is to write your own window manager in Rust, depending on this
-//! crate. A sample config would look like this:
+//! crate. The most minimal config looks like this:
 //! ```no_run
 //! use lapin::keys::*;
 //! use lapin::layouts::*;
 //! use lapin::*;
+//! use std::env;
 //!
+//! #[rustfmt::skip]
 //! fn main() {
-//!     // The first thing to do is always call Lapin::connect() to create a
-//!     // new Lapin object and connect to the X server.
+//!     // First, we connect to the X server and creates a window
+//!     // manager object.
 //!     let mut lapin = Lapin::connect();
 //!
-//!     // A good pratice is to define things you'll use a lot later as const.
-//!     const MODKEY: &str = "Meta";
+//!     // The best way to set the modkey and other things you'll use
+//!     // later is assigning constants.
+//!     const MODKEY: &str = "Super";
 //!     const TERMINAL: &str = "alacritty";
 //!
-//!     // Some configurations are kept inside a Config struct, member of
-//!     // Lapin. "mouse_mod", for example, is the modifier we use with the
-//!     // mouse buttons to move windows around (with button 1) and resize then
-//!     // (with button 2).
-//!     lapin.config.mouse_mod = &[MODKEY];
-//!     // The workspaces number and name are handled here too. By default,
-//!     // they're 9 workspaces named as numbers from 1 to 9. In this example,
-//!     // we'll use 3:
-//!     lapin.config.workspaces = &["dev", "web", "sys"];
-//!
-//!     // Border colors are also handled here. They're u32 numbers in the form
-//!     // ARGB.
-//!                                      // A R G B
-//!     lapin.config.border_color       = 0xff000000;
-//!     lapin.config.border_color_focus = 0xffffffff;
-//!
-//!     // Keybinds are handled by the main_loop function, separately from the
-//!     // window manager struct. We create a new empty set then bind some keys
-//!     // to it:
+//!     // Keybinds are handled in a separate object, here we create
+//!     // it and bind keys. The macro lazy! is used to create a
+//!     // callback closure.
 //!     let mut keybinds = KeybindSet::new();
 //!     keybinds.bindall(vec![
 //!         // workspace keys
-//!         (&[MODKEY], "1", lazy! {wm, wm.goto_workspace(1)}),
-//!         (&[MODKEY], "2", lazy! {wm, wm.goto_workspace(2)}),
-//!         (&[MODKEY], "3", lazy! {wm, wm.goto_workspace(3)}),
+//!         (&[MODKEY], "1", lazy! {wm, wm.goto_workspace(0)}),
+//!         (&[MODKEY], "2", lazy! {wm, wm.goto_workspace(1)}),
+//!         (&[MODKEY], "3", lazy! {wm, wm.goto_workspace(2)}),
+//!         (&[MODKEY], "4", lazy! {wm, wm.goto_workspace(3)}),
+//!         (&[MODKEY], "5", lazy! {wm, wm.goto_workspace(4)}),
+//!         (&[MODKEY], "6", lazy! {wm, wm.goto_workspace(5)}),
+//!         (&[MODKEY], "7", lazy! {wm, wm.goto_workspace(6)}),
+//!         (&[MODKEY], "8", lazy! {wm, wm.goto_workspace(7)}),
+//!         (&[MODKEY], "9", lazy! {wm, wm.goto_workspace(8)}),
+//!         (&[MODKEY, "Shift"], "1", lazy! {wm, wm.send_window_to_workspace(0)}),
+//!         (&[MODKEY, "Shift"], "2", lazy! {wm, wm.send_window_to_workspace(1)}),
+//!         (&[MODKEY, "Shift"], "3", lazy! {wm, wm.send_window_to_workspace(2)}),
+//!         (&[MODKEY, "Shift"], "4", lazy! {wm, wm.send_window_to_workspace(3)}),
+//!         (&[MODKEY, "Shift"], "5", lazy! {wm, wm.send_window_to_workspace(4)}),
+//!         (&[MODKEY, "Shift"], "6", lazy! {wm, wm.send_window_to_workspace(5)}),
+//!         (&[MODKEY, "Shift"], "7", lazy! {wm, wm.send_window_to_workspace(6)}),
+//!         (&[MODKEY, "Shift"], "8", lazy! {wm, wm.send_window_to_workspace(7)}),
+//!         (&[MODKEY, "Shift"], "9", lazy! {wm, wm.send_window_to_workspace(8)}),
 //!         // quit
 //!         (&[MODKEY], "q", lazy! {Lapin::quit()}),
 //!         // spawns
@@ -85,46 +92,52 @@
 //!         // change layout
 //!         (&[MODKEY], "space", lazy! {wm, wm.next_layout()}),
 //!         (&[MODKEY, "Shift"], "space", lazy! {wm, wm.prev_layout()}),
+//!         // swap slaves
+//!         (&[MODKEY, "Shift"], "k", lazy! {wm, wm.swap_with_prev_slave()}),
+//!         (&[MODKEY, "Shift"], "j", lazy! {wm, wm.swap_with_next_slave()}),
+//!         // change master
+//!         (&[MODKEY, "Shift"], "Return", lazy! {wm, wm.change_master()}),
+//!         // toggle ool
+//!         (&[MODKEY, "Shift"], "t", lazy! {wm, wm.toggle_ool()}),
+//!         // fullscreen
+//!         (&[MODKEY, "Shift"], "f", lazy! {wm, wm.fullscreen()}),
+//!         // change focused screen (monitor)
+//!         (&[MODKEY], "y", lazy! {wm, wm.prev_screen()}),
+//!         (&[MODKEY], "u", lazy! {wm, wm.next_screen()}),
+//!         // change focused window screen
+//!         (&[MODKEY, "Shift"], "y", lazy! {wm, wm.send_window_to_prev_screen()}),
+//!         (&[MODKEY, "Shift"], "u", lazy! {wm, wm.send_window_to_next_screen()}),
 //!
-//!         //
-//!         // You can check other useful functions to use as keybinds in the
-//!         // docs for the Lapin struct.
-//!         //
+//!	    //
+//!	    // Check all callbacks usefull for keybinds in the the docs
+//!	    // for the Lapin struct
+//!	    //
 //!     ]);
 //!
-//!     // You can create Layouts with different configs. To use default ones,
-//!     // use their "new()" functions. Custom layouts can be created just by
-//!     // implementing the Layout trait for them. The default config has
-//!     // the three default layouts with default config.
-//!     let tile = Tiling {
-//!         name: "tile",
-//!         borders: 4,
-//!         master_factor: 1.0 / 2.0,
-//!         gaps: 4,
-//!     };
-//!     let max = Maximized::new();
-//!     let float = Floating {
-//!         name: "float",
-//!         borders: 4,
-//!     };
+//!     // The modkey used to move and resize floating windows.
+//!     lapin.config.mouse_mod = &[MODKEY];
 //!
-//!     // Use the layouts! macro to create a list of layouts.
+//!     // The three default layouts.
+//!     let tile = Tiling::new();
+//!     let max = Maximized::new();
+//!     let float = Floating::new();
 //!     lapin.config.layouts = layouts![tile, max, float];
 //!
-//!     // With a callback, you can easily access and modify the WM
-//!     // and autostart programs as soon as everything is set up.
-//!     let mut callback = lazy![wm, {
-//!        let home = env!("HOME");
-//!	   Lapin::spawn("picom");
-//!        Lapin::spawn(&format!(
-//!            "feh --no-fehbg --bg-fill {home}/.config/wallpaper"
-//!        ));
-//!        println!("There's {} monitors available", wm.screens.len());
-//!     }];
+//!     //
+//!     // Check all config options in docs for the Config struct.
+//!     //
 //!
-//!     // The last thing to do is starting the window manager with the keybind
-//!     // set with Lapin::init(&mut KeybindSet, Option<&mut Callback>).
-//!     lapin.init(&mut keybinds, Some(&mut callback));
+//!     // We can assign a closure to be called right after everything
+//!     // is setup.
+//!     let mut callback = lazy! {wm, {
+//!         let home = env!("HOME");
+//!         Lapin::spawn("picom");
+//!         Lapin::spawn(&format!("feh --no-fehbg --bg-fill {home}/.config/wallpaper"));
+//!     }};
+//!
+//!     // The last thing to do is init the window manager object with
+//!     // the keybinds and the callback.
+//!     lapin.init(&mut keybinds, Some(callback));
 //! }
 //! ```
 

@@ -496,6 +496,9 @@ impl Lapin {
         self.x_connection.flush().ok();
     }
 
+    /// Sends window to the "out of layout" stack, or sends it back to
+    /// the main stack. Out of layout windows are not managed by the
+    /// layout, so they stay floating.
     pub fn toggle_ool(&mut self) {
         if let Some(w) = self.current_workspace().focused {
             if self.current_workspace().ool_focus {

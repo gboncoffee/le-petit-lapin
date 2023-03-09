@@ -1,6 +1,5 @@
 use lapin::keys::*;
 use lapin::layouts::*;
-use lapin::rules::*;
 use lapin::*;
 use std::env;
 
@@ -61,17 +60,14 @@ fn main() {
         // change focused window screen
         (&[MODKEY, "Shift"], "y", lazy! {wm, wm.send_window_to_prev_screen()}),
         (&[MODKEY, "Shift"], "u", lazy! {wm, wm.send_window_to_next_screen()}),
-	// toggle bar
-        (&[MODKEY, "Shift"], "b", lazy! {wm, wm.toggle_reserved_space()}),
+
+	//
+	// Check all callbacks usefull for keybinds in the the docs
+	// for the Lapin struct
+	//
     ]);
 
     lapin.config.mouse_mod = &[MODKEY];
-    lapin.config.mouse_raises_window = false;
-
-    lapin.config.border_color = 0xff282a36;
-    lapin.config.border_color_focus = 0xffff79c6;
-
-    lapin.config.reserved_space = (40, 10, 10, 10);
 
     let tile = Tiling::new();
     let max = Maximized::new();
@@ -79,20 +75,15 @@ fn main() {
 
     lapin.config.layouts = layouts![tile, max, float];
 
-    lapin.config.rules = vec![
-        rule!(class "gimp" => Apply::Float),
-        rule!(class "mpv" => Apply::Fullscreen),
-        rule!(class "qbittorrent" => Apply::Workspace(1)),
-    ];
+    //
+    // Check all config options in docs for the Config struct.
+    //
 
-    let mut callback = lazy![wm, {
-        let home = env!("HOME");
-        Lapin::spawn("picom");
-        Lapin::spawn(&format!(
-            "feh --no-fehbg --bg-fill {home}/.config/wallpaper"
-        ));
-        println!("There's {} monitors available", wm.screens.len());
-    }];
+    let mut callback = lazy! {wm, {
+	let home = env!("HOME");
+	Lapin::spawn("picom");
+	Lapin::spawn(&format!("feh --no-fehbg --bg-fill {home}/.config/wallpaper"));
+    }};
 
-    lapin.init(&mut keybinds, Some(&mut callback));
+    lapin.init(&mut keybinds, Some(callback));
 }

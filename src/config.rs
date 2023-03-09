@@ -19,8 +19,8 @@ pub struct Config {
     pub border_color_focus: u32,
     /// Border width of ool windows. Defaults to `4`.
     pub border_width: u32,
-    /// Space in the sides to reserve for a bar. In the format (top,
-    /// right, bottom, left). Defaults to (0, 0, 0, 0).
+    /// Outer gaps, usefull to reserve space for a bar. In the format
+    /// (top, right, bottom, left). Defaults to (0, 0, 0, 0).
     pub reserved_space: (u16, u16, u16, u16),
     /// Layouts to use. Defaults to the three built-in layouts with
     /// default configs.
