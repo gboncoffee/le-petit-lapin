@@ -477,6 +477,19 @@ impl Lapin {
                     && self.current_workspace().ool_windows.len() > 0
                 {
                     self.current_workspace_mut().focused = Some(focused - 1);
+                } else if ool && self.current_workspace().ool_windows.len() == 0 {
+                    self.current_workspace_mut().focused = None;
+                }
+                // fix focus when removing a window right after
+                // switching to the workspace idk this just happens to
+                // happen. I think I need coffee but it's 23:30
+                if !ool
+                    && focused >= self.current_workspace().windows.len()
+                    && self.current_workspace().windows.len() > 0
+                {
+                    self.current_workspace_mut().focused = Some(focused - 1)
+                } else if !ool && self.current_workspace_mut().windows.len() == 0 {
+                    self.current_workspace_mut().focused = None;
                 }
             }
             if !ool {
