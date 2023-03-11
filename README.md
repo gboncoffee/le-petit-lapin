@@ -89,3 +89,5 @@ for config examples and snippets.
 ![Screenshot](assets/first-rice-showing-emacs.png)
 
 ![Screenshot](assets/first-rice-onefetch.png)
+
+![Screenshot](assets/cyberpunk-rice.png)
