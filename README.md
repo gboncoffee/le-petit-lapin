@@ -1,3 +1,6 @@
+A simple and functional X window manager. Archived as I do not want to maintain
+this project.
+
 ![Screenshot](assets/first-rice-tilling-windows.png)
 # Le Petit Lapin
 
